@@ -123,6 +123,23 @@ def _respond(cmd_id: str, timeout_ms: int = 60000):
             _cv.wait(remaining)
 
 
+def _kill_bridge():
+    """Kill the bridge subprocess (it hung or died) so the next command
+    respawns a fresh one. Without this, one hung bridge fails every future
+    broadcast with 'bridge timeout' until the whole backend restarts."""
+    global _proc
+    with _lock:
+        proc = _proc
+        _proc = None
+    if proc and proc.poll() is None:
+        try:
+            proc.kill()
+        except Exception:  # noqa: BLE001
+            pass
+    with _cv:
+        _pending.clear()
+
+
 def _command(cmd: dict, timeout_ms: int = 60000) -> dict:
     global _id_counter, _proc
     if not _start():
@@ -139,7 +156,10 @@ def _command(cmd: dict, timeout_ms: int = 60000) -> dict:
             return {"ok": False, "error": f"bridge not running: {e}"}
     resp = _respond(cmd_id, timeout_ms)
     if resp is None:
-        return {"ok": False, "error": "bridge timeout"}
+        # Bridge hung — kill it so the next broadcast gets a fresh one.
+        logger.error("bridge timed out on %s; respawning on next use", cmd.get("cmd"))
+        _kill_bridge()
+        return {"ok": False, "error": "bridge timeout (respawned)"}
     return resp
 
 

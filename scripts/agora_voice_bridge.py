@@ -387,6 +387,12 @@ class Broadcaster:
                 # SDK's sender drains cleanly (no abrupt cut artifact).
                 time.sleep(0.25)
                 _emit({"event": "speech", "channel": channel, "state": "stop"})
+            except Exception as e:  # noqa: BLE001
+                # Dead/unusable connection (server timeout etc.) — drop it so
+                # the next broadcast reconnects fresh instead of failing too.
+                logger.error("publish to %s failed (%s); releasing connection", channel, e)
+                self._release(channel)
+                raise
             finally:
                 with self._lock:
                     self._stream_pos_ms[channel] = max(

@@ -40,6 +40,7 @@ export function useAgora({ channel, uid, role, enabled }: UseAgoraOptions) {
   const [status, setStatus] = useState<AgoraStatus>("idle");
   const [peers, setPeers] = useState<number[]>([]);
   const [error, setError] = useState("");
+  const [aiOnline, setAiOnline] = useState(false);
 
   // ─── Same-browser multi-tab guard ───────────────────────────────
   // When two tabs of the SAME browser join the same channel (local testing),
@@ -177,10 +178,15 @@ export function useAgora({ channel, uid, role, enabled }: UseAgoraOptions) {
 
       client.on("user-joined", (user) => {
         setPeers((prev) => (prev.includes(user.uid as number) ? prev : [...prev, user.uid as number]));
+        if (Number(user.uid) === AI_UID) setAiOnline(true);
       });
       client.on("user-left", (user) => {
         setPeers((prev) => prev.filter((u) => u !== user.uid));
         user.audioTrack?.stop();
+        // The AI's bridge died (server timeout / backend restart) — surface
+        // it so the room can release the mic duck instead of waiting for an
+        // AI_VOICE stop event that will never arrive.
+        if (Number(user.uid) === AI_UID) setAiOnline(false);
       });
       client.on("user-published", async (user, mediaType) => {
         if (mediaType !== "audio") return;
@@ -262,5 +268,5 @@ export function useAgora({ channel, uid, role, enabled }: UseAgoraOptions) {
     };
   }, []);
 
-  return { status, peers, error, join, leave, duckMic };
+  return { status, peers, error, join, leave, duckMic, aiOnline };
 }

@@ -242,6 +242,7 @@ export default function ClassroomRoom() {
     peers: agoraPeers,
     error: agoraError,
     duckMic,
+    aiOnline,
   } = useAgora({
     channel: `sahayak-${roomId}`,
     uid: userId,
@@ -261,6 +262,17 @@ export default function ClassroomRoom() {
       holdDuck(2_500); // tail silence + transport still in flight — un-duck late
     }
   }, [aiVoiceSpeaking, holdDuck]);
+
+  // The AI's bridge died mid-speech (server timeout / backend restart) —
+  // the AI_VOICE stop event will never arrive, so release the mic duck now
+  // instead of leaving the teacher muted for two minutes.
+  useEffect(() => {
+    if (!aiOnline && aiVoiceSpeaking) {
+      setAiVoiceSpeaking(false);
+      releaseDuck();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiOnline]);
 
   // Tell the backend whether this participant is in the live audio channel so
   // it knows when to broadcast Sahayak's voice into it.
@@ -345,7 +357,7 @@ export default function ClassroomRoom() {
             <div>
               <h1 className="font-bold text-lg">Sahayak Live</h1>
               <p className="text-xs text-white/50">
-                Room: {roomId} <span className="text-white/25">· a4</span>
+                Room: {roomId} <span className="text-white/25">· a5</span>
               </p>
             </div>
           </div>
