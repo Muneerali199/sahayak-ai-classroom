@@ -52,3 +52,4 @@ __pycache__/
 /piper-venv/
 backend/classroom/*.log
 
+public/AgoraRTC.js
