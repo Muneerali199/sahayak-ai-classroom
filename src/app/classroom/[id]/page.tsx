@@ -123,6 +123,14 @@ export default function ClassroomRoom() {
 
   const handleMessage = useCallback((msg: Record<string, unknown>) => {
     const type = msg.type as string;
+    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+    const addAiMessage = (text: string) => {
+      setTranscript((prev) => [
+        ...prev,
+        { speaker_id: "sahayak-ai", name: "Sahayak", role: "ai", text, timestamp: now },
+      ]);
+    };
 
     switch (type) {
       case "JOINED":
@@ -143,6 +151,7 @@ export default function ClassroomRoom() {
       case "AI_SPEAK": {
         const content = msg.content as string;
         setAiCaption(content);
+        addAiMessage(content);
         // Kill any local TTS still playing (e.g. a previous message) — with
         // the channel broadcast active, a second locally-played voice is the
         // "disturbing background sound" during AI speech.
@@ -189,6 +198,7 @@ export default function ClassroomRoom() {
         setQuizActive(true);
         setQuizTarget(msg.target_student_id as string);
         setAiCaption(`Quiz for ${msg.target_name}: ${msg.content}`);
+        addAiMessage(`📋 Quiz for ${msg.target_name}: ${msg.content}`);
         stopSpeaking();
         if (!msg.via_channel) {
           speak(msg.content as string);
@@ -200,6 +210,7 @@ export default function ClassroomRoom() {
       case "QUIZ_RESULT":
         setQuizActive(false);
         setAiCaption(msg.content as string);
+        addAiMessage(msg.content as string);
         stopSpeaking();
         if (!msg.via_channel) {
           speak(msg.content as string);
@@ -333,9 +344,19 @@ export default function ClassroomRoom() {
             </div>
             <div>
               <h1 className="font-bold text-lg">Sahayak Live</h1>
-              <p className="text-xs text-white/50">Room: {roomId}</p>
+              <p className="text-xs text-white/50">
+                Room: {roomId} <span className="text-white/25">· a3</span>
+              </p>
             </div>
           </div>
+
+          {/* AI speaking: mic auto-paused indicator */}
+          {aiVoiceSpeaking && (
+            <div className="px-3 py-1.5 rounded-full border border-purple-500/40 bg-purple-500/20 text-purple-200 text-xs font-medium flex items-center gap-2 animate-pulse">
+              <VolumeX className="w-3.5 h-3.5" />
+              Mic paused · AI speaking
+            </div>
+          )}
 
           {/* Floor State Badge */}
           <motion.div

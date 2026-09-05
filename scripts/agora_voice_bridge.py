@@ -160,6 +160,7 @@ class Broadcaster:
         self._service: AgoraService | None = None
         self._conns: dict[str, tuple] = {}  # channel -> (connection, last_used_ts)
         self._publish_locks: dict[str, threading.Lock] = {}  # one broadcast at a time per channel
+        self._keepers: dict[str, threading.Event] = {}  # channel -> stop event for silence keeper
         self._stop = False
         threading.Thread(target=self._reaper, daemon=True).start()
 
@@ -227,15 +228,62 @@ class Broadcaster:
                 conn.publish_audio()
             except Exception:  # noqa: BLE001
                 pass
+            # (still holding the outer self._lock from _get_connection)
             self._conns[channel] = (conn, time.time())
+            self._publish_locks.setdefault(channel, threading.Lock())
+            stop_evt = threading.Event()
+            self._keepers[channel] = stop_evt
+            threading.Thread(
+                target=self._keeper_loop, args=(channel, stop_evt),
+                daemon=True, name=f"keeper-{channel}",
+            ).start()
             logger.info("joined channel %s (uid %s)", channel, AI_UID)
             return conn
+
+    def _keeper_loop(self, channel: str, stop_evt: threading.Event):
+        """Keep the AI's audio track published between broadcasts.
+
+        The native SDK unpublishes a custom PCM track a few seconds after its
+        data stops ("stream removed"). Every re-publish cycle tears down and
+        recreates the audio element on every client — those transitions are
+        audible glitches (the mid-speech "background bad voice"). Pushing a
+        trickle of silence keeps the track alive, exactly like a real mic.
+        """
+        conn = self._conns.get(channel, (None,))[0]
+        if conn is None:
+            return
+        silence = b"\x00" * int(PUSH_RATE * PUSH_CHANNELS * 2 * 0.1)  # 100ms
+        while not stop_evt.is_set() and not self._stop:
+            stop_evt.wait(0.1)
+            if stop_evt.is_set() or self._stop:
+                break
+            with self._lock:
+                entry = self._conns.get(channel)
+                if not entry or entry[0] is not conn:
+                    break  # connection was released
+                self._conns[channel] = (conn, time.time())  # keeper = alive
+            with self._lock:
+                pub_lock = self._publish_locks.get(channel)
+            if pub_lock is None:
+                continue
+            if pub_lock.acquire(blocking=False):
+                # Speech broadcast not in flight — top the track up with
+                # silence so the SDK never sees an empty sender buffer.
+                try:
+                    conn.push_audio_pcm_data(bytearray(silence), PUSH_RATE, PUSH_CHANNELS, 0)
+                except Exception:  # noqa: BLE001
+                    pass
+                pub_lock.release()
+        logger.info("silence keeper stopped for %s", channel)
 
     def _release(self, channel: str):
         with self._lock:
             entry = self._conns.pop(channel, None)
-            if not entry:
-                return
+            evt = self._keepers.pop(channel, None)
+        if evt:
+            evt.set()
+        if not entry:
+            return
         conn = entry[0]
         try:
             conn.disconnect()
@@ -342,6 +390,14 @@ def handle_speak(cmd: dict) -> dict:
         return {"ok": False, "error": str(e)}
 
 
+def handle_leave(cmd: dict) -> dict:
+    channel = cmd.get("channel", "")
+    if not channel:
+        return {"ok": False, "error": "no channel"}
+    BROADCASTER._release(channel)
+    return {"ok": True, "channel": channel}
+
+
 def main():
     logger.info("bridge started (python %s)", sys.version.split()[0])
     for line in sys.stdin:
@@ -359,6 +415,8 @@ def main():
         try:
             if ctype == "speak":
                 resp = handle_speak(cmd)
+            elif ctype == "leave":
+                resp = handle_leave(cmd)
             elif ctype == "ping":
                 resp = {"ok": True, "pong": time.time()}
             elif ctype == "shutdown":

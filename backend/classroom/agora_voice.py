@@ -172,6 +172,22 @@ def broadcast_speech(channel: str, text: str, lang: str = "en") -> bool:
     return True
 
 
+def leave_channel(channel: str) -> bool:
+    """Tell the bridge to leave a channel (room's live audio fully ended)."""
+    if not available():
+        return False
+
+    def worker():
+        try:
+            resp = _command({"cmd": "leave", "channel": channel})
+            logger.info("voice leave → %s: %s", channel, resp)
+        except Exception as e:  # noqa: BLE001
+            logger.error("voice leave failed for %s: %s", channel, e)
+
+    threading.Thread(target=worker, daemon=True, name="ai-voice-leave").start()
+    return True
+
+
 def shutdown():
     global _proc
     with _lock:

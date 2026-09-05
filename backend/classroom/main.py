@@ -66,6 +66,12 @@ def drop_live_audio(room_id: str):
         AUDIO_LIVE[room_id] = max(0, AUDIO_LIVE[room_id] - 1)
         if AUDIO_LIVE[room_id] == 0:
             AUDIO_LIVE.pop(room_id, None)
+            # Nobody is listening anymore — have the AI leave its Agora
+            # channel so the silence keeper and connection wind down cleanly.
+            try:
+                agora_voice.leave_channel(agora_channel_for(room_id))
+            except Exception:  # noqa: BLE001
+                logger.exception("voice leave dispatch failed for %s", room_id)
 
 
 def maybe_voice_broadcast(room_id: str, text: str, lang: str = "en") -> bool:
