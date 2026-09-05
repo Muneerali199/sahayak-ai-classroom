@@ -49,7 +49,7 @@ from tts import synthesize  # noqa: E402  (Piper lives in the same venv)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [bridge] %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-PUSH_RATE = 16000  # Agora's standard custom-PCM pipeline rate
+PUSH_RATE = int(os.environ.get("AGORA_PUSH_RATE", "16000"))  # Agora's standard custom-PCM pipeline rate
 PUSH_CHANNELS = 1
 FRAME_MS = 50
 AI_UID = int(os.environ.get("AGORA_AI_UID", "1396787265"))
@@ -136,6 +136,20 @@ def _append_silence(pcm: bytes, rate: int, ms: int) -> bytes:
         return pcm
     n = int(rate * ms // 1000) * 2
     return pcm + b"\x00" * n
+
+
+def _pad_to_10ms(pcm: bytes, rate: int, channels: int) -> bytes:
+    """Pad to a whole number of 10ms frames.
+
+    push_audio_pcm_data rejects (error -1002) any chunk whose length is not a
+    multiple of 1ms of audio; a short final chunk would be silently dropped,
+    clipping/garbling the last word of every broadcast.
+    """
+    unit = int(rate * channels * 2 / 1000 * 10)
+    pad = (-len(pcm)) % unit
+    if pad:
+        return pcm + b"\x00" * pad
+    return pcm
 
 
 # ─── Broadcaster ─────────────────────────────────────────────────────
@@ -250,21 +264,38 @@ class Broadcaster:
             pcm = _scale(pcm, AI_VOLUME)
             pcm = _fade_edges(pcm, rate)
             pcm = _append_silence(pcm, rate, TAIL_SILENCE_MS)
+            pcm = _pad_to_10ms(pcm, rate, channels)
             conn = self._get_connection(channel, token)
-            bytes_per_sec = rate * channels * 2
-            frame_bytes = max(1, bytes_per_sec * FRAME_MS // 1000)
+            # Mirrors the SDK's own AudioConsumer pacing (10ms frame units,
+            # ~200ms pushed ahead of the playback clock): without this lead
+            # any scheduler hiccup starves the encoder and listeners hear
+            # glitches mid-speech.
+            bytes_per_ms = rate * channels * 2 / 1000
+            unit_ms = 10
+            lead_ms = 200
+            total_ms = len(pcm) / bytes_per_ms
             start = time.time()
-            offset = 0
-            total = len(pcm)
-            while offset < total and not self._stop:
-                chunk = pcm[offset:offset + frame_bytes]
-                conn.push_audio_pcm_data(bytearray(chunk), rate, channels, 0)
-                offset += len(chunk)
-                target = start + offset / bytes_per_sec
-                delay = target - time.time()
-                if delay > 0:
-                    time.sleep(delay)
-            return offset / bytes_per_sec if bytes_per_sec else 0.0
+            pushed_ms = 0.0
+            _emit({"event": "speech", "channel": channel, "state": "start"})
+            try:
+                while pushed_ms < total_ms and not self._stop:
+                    elapsed_ms = (time.time() - start) * 1000
+                    target_ms = min(elapsed_ms + lead_ms, total_ms)
+                    while pushed_ms < target_ms:
+                        n_ms = min(unit_ms, total_ms - pushed_ms)
+                        i0 = int(round(pushed_ms * bytes_per_ms))
+                        i1 = int(round((pushed_ms + n_ms) * bytes_per_ms))
+                        conn.push_audio_pcm_data(
+                            bytearray(pcm[i0:i1]), rate, channels, 0
+                        )
+                        pushed_ms += n_ms
+                    time.sleep(0.004)
+            finally:
+                # Hold the stream open briefly after the last frame so the
+                # SDK's sender drains cleanly (no abrupt cut artifact).
+                time.sleep(0.25)
+                _emit({"event": "speech", "channel": channel, "state": "stop"})
+            return pushed_ms / 1000.0
 
     def shutdown(self):
         self._stop = True
@@ -280,6 +311,16 @@ class Broadcaster:
 
 BROADCASTER = Broadcaster()
 
+# stdout is shared by response lines (main loop) and event lines (publish
+# threads) — serialize writes so they never interleave into broken JSON.
+_stdout_lock = threading.Lock()
+
+
+def _emit(event: dict):
+    """Notify the backend of a lifecycle event (e.g. speech start/stop)."""
+    with _stdout_lock:
+        print(json.dumps(event), flush=True)
+
 
 # ─── Command handlers ────────────────────────────────────────────────
 
@@ -287,14 +328,15 @@ def handle_speak(cmd: dict) -> dict:
     text = cmd.get("text", "")
     if not text:
         return {"ok": False, "error": "empty text"}
+    rate_push = int(cmd.get("rate", PUSH_RATE))
     wav, _ = synthesize(text, cmd.get("lang"))
     pcm, rate = _decode_wav(wav)
-    pcm = _resample(pcm, rate, PUSH_RATE)
+    pcm = _resample(pcm, rate, rate_push)
     try:
         seconds = BROADCASTER.publish(
-            cmd["channel"], cmd["token"], pcm, PUSH_RATE, PUSH_CHANNELS
+            cmd["channel"], cmd["token"], pcm, rate_push, PUSH_CHANNELS
         )
-        return {"ok": True, "seconds": round(seconds, 2), "pcm_bytes": len(pcm), "text_len": len(text)}
+        return {"ok": True, "seconds": round(seconds, 2), "pcm_bytes": len(pcm), "text_len": len(text), "rate": rate_push}
     except Exception as e:  # noqa: BLE001
         logger.error("publish failed: %s", e, exc_info=True)
         return {"ok": False, "error": str(e)}
@@ -321,14 +363,16 @@ def main():
                 resp = {"ok": True, "pong": time.time()}
             elif ctype == "shutdown":
                 resp = {"ok": True}
-                print(json.dumps({"id": cid, **resp}), flush=True)
+                with _stdout_lock:
+                    print(json.dumps({"id": cid, **resp}), flush=True)
                 break
             else:
                 resp = {"ok": False, "error": f"unknown cmd {ctype!r}"}
         except Exception as e:  # noqa: BLE001
             logger.error("handler crashed: %s", e, exc_info=True)
             resp = {"ok": False, "error": str(e)}
-        print(json.dumps({"id": cid, **resp}), flush=True)
+        with _stdout_lock:
+            print(json.dumps({"id": cid, **resp}), flush=True)
 
     BROADCASTER.shutdown()
     logger.info("bridge exited")

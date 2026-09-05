@@ -35,9 +35,100 @@ async function loadAgora() {
 export function useAgora({ channel, uid, role, enabled }: UseAgoraOptions) {
   const clientRef = useRef<IAgoraRTCClient | null>(null);
   const micTrackRef = useRef<ILocalAudioTrack | null>(null);
+  const duckRef = useRef(false);
+  const leaderRef = useRef(true);
   const [status, setStatus] = useState<AgoraStatus>("idle");
   const [peers, setPeers] = useState<number[]>([]);
   const [error, setError] = useState("");
+
+  // ─── Same-browser multi-tab guard ───────────────────────────────
+  // When two tabs of the SAME browser join the same channel (local testing),
+  // both play the AI's voice a few hundred ms apart → metallic phasing that
+  // sounds like noise under the AI speech. Elect one "audio leader" tab via
+  // BroadcastChannel: only it plays remote audio. The teacher tab always
+  // wins (they need to hear the room); otherwise oldest tab leads. Tabs in
+  // other browsers (real classrooms, separate devices) are unaffected.
+  const bcRef = useRef<BroadcastChannel | null>(null);
+  const peersRef = useRef<Map<string, { ts: number; seen: number; teacher: boolean }>>(new Map());
+  const selfId = useRef(`t-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
+  const selfTs = useRef(Date.now());
+
+  const applyRemoteVolumes = useCallback(() => {
+    const client = clientRef.current;
+    if (!client) return;
+    const leader = leaderRef.current;
+    client.remoteUsers.forEach((u) => {
+      const t = u.audioTrack;
+      if (!t) return;
+      try {
+        t.setVolume(Number(u.uid) === AI_UID && leader ? AI_TRACK_VOLUME : leader ? 100 : 0);
+      } catch {
+        /* track may be mid-unpublish */
+      }
+    });
+  }, []);
+
+  const electLeader = useCallback(() => {
+    const isTeacherTab = role === "teacher";
+    let best = { id: selfId.current, ts: selfTs.current, teacher: isTeacherTab };
+    peersRef.current.forEach((v, k) => {
+      const better =
+        v.teacher && !best.teacher ||
+        (v.teacher === best.teacher && (v.ts < best.ts || (v.ts === best.ts && k < best.id)));
+      if (better) best = { id: k, ts: v.ts, teacher: v.teacher };
+    });
+    const amLeader = best.id === selfId.current;
+    if (amLeader !== leaderRef.current) {
+      leaderRef.current = amLeader;
+      applyRemoteVolumes();
+    }
+  }, [role, applyRemoteVolumes]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") return;
+    const bcName = `sahayak-audio-${channel}`;
+    const bc = new BroadcastChannel(bcName);
+    bcRef.current = bc;
+    const announce = () =>
+      bc.postMessage({ id: selfId.current, ts: selfTs.current, teacher: role === "teacher" });
+    bc.onmessage = (ev) => {
+      const d = ev.data;
+      if (!d || d.id === selfId.current) return;
+      peersRef.current.set(d.id, { ts: d.ts, seen: Date.now(), teacher: Boolean(d.teacher) });
+      electLeader();
+    };
+    announce();
+    const hello = setInterval(announce, 1500);
+    const election = setInterval(() => {
+      const now = Date.now();
+      let changed = false;
+      peersRef.current.forEach((v, k) => {
+        if (now - v.seen > 5000) { peersRef.current.delete(k); changed = true; }
+      });
+      electLeader();
+      if (changed) applyRemoteVolumes();
+    }, 2000);
+    return () => {
+      clearInterval(hello);
+      clearInterval(election);
+      bc.close();
+      bcRef.current = null;
+    };
+  }, [channel, role, electLeader, applyRemoteVolumes]);
+
+  // Mute/unmute the local mic (used to duck the mic while the AI's voice
+  // plays, so the AI can never hear itself through speakers -> mic -> channel).
+  const duckMic = useCallback((duck: boolean) => {
+    duckRef.current = duck;
+    const track = micTrackRef.current;
+    if (!track) return;
+    try {
+      const r = track.setMuted(duck) as unknown as Promise<void> | undefined;
+      if (r && typeof r.catch === "function") r.catch(() => {});
+    } catch {
+      /* older SDKs return synchronously */
+    }
+  }, []);
 
   const leave = useCallback(async () => {
     const client = clientRef.current;
@@ -95,8 +186,17 @@ export function useAgora({ channel, uid, role, enabled }: UseAgoraOptions) {
         if (mediaType !== "audio") return;
         await client.subscribe(user, mediaType);
         user.audioTrack?.play();
-        // Play the AI softly — never blasting.
-        if (Number(user.uid) === AI_UID) user.audioTrack?.setVolume(AI_TRACK_VOLUME);
+        // The AI speaks softly; humans at full volume — but only the
+        // leader tab outputs anything (same-browser tab guard).
+        try {
+          if (Number(user.uid) === AI_UID) {
+            user.audioTrack?.setVolume(leaderRef.current ? AI_TRACK_VOLUME : 0);
+          } else {
+            user.audioTrack?.setVolume(leaderRef.current ? 100 : 0);
+          }
+        } catch {
+          /* ignore */
+        }
       });
       client.on("user-unpublished", (user, mediaType) => {
         if (mediaType === "audio") user.audioTrack?.stop();
@@ -123,6 +223,7 @@ export function useAgora({ channel, uid, role, enabled }: UseAgoraOptions) {
           );
           if (published) {
             micTrackRef.current = track;
+            if (duckRef.current) duckMic(true);
           } else {
             track.close();
           }
@@ -161,5 +262,5 @@ export function useAgora({ channel, uid, role, enabled }: UseAgoraOptions) {
     };
   }, []);
 
-  return { status, peers, error, join, leave };
+  return { status, peers, error, join, leave, duckMic };
 }

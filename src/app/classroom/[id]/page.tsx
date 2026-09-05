@@ -96,8 +96,26 @@ export default function ClassroomRoom() {
   const [quizActive, setQuizActive] = useState(false);
   const [quizTarget, setQuizTarget] = useState("");
   const [liveAudio, setLiveAudio] = useState(false);
+  const [aiVoiceSpeaking, setAiVoiceSpeaking] = useState(false);
 
   const transcriptEndRef = useRef<HTMLDivElement>(null);
+
+  // ─── Mic ducking (mute local mic while the AI speaks) ───
+  // The AI's voice plays through speakers; if the mic stays open it loops
+  // back into the channel as a delayed copy — the "disturbing background
+  // sound". One scheduled un-duck; every AI activity extends the hold.
+  const duckMicRef = useRef<(duck: boolean) => void>(() => {});
+  const undockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdDuck = useCallback((ms: number) => {
+    duckMicRef.current(true);
+    if (undockTimer.current) clearTimeout(undockTimer.current);
+    undockTimer.current = setTimeout(() => duckMicRef.current(false), ms);
+  }, []);
+  const releaseDuck = useCallback(() => {
+    if (undockTimer.current) clearTimeout(undockTimer.current);
+    duckMicRef.current(false);
+  }, []);
+  useEffect(() => releaseDuck, [releaseDuck]);
 
   // ─── WebSocket ──────────────────────────────────────────
   const wsUrl = `ws://127.0.0.1:8001/ws/classroom/${roomId}`;
@@ -122,19 +140,32 @@ export default function ClassroomRoom() {
         setFloorBadge(msg.badge as string);
         setAiPermitted(msg.ai_permitted as boolean);
         break;
-      case "AI_SPEAK":
+      case "AI_SPEAK": {
         const content = msg.content as string;
         setAiCaption(content);
-        if (!msg.via_channel) speak(content);
+        // Kill any local TTS still playing (e.g. a previous message) — with
+        // the channel broadcast active, a second locally-played voice is the
+        // "disturbing background sound" during AI speech.
+        stopSpeaking();
+        if (msg.via_channel) {
+          holdDuck(120_000); // released by AI_VOICE stop (+ tail grace)
+        } else {
+          speak(content);
+          holdDuck(2_500 + content.length * 90); // cover local TTS playback
+        }
         setTimeout(() => setAiCaption(""), 5000);
         break;
-      case "WHISPER":
+      }
+      case "WHISPER": {
         const whisperContent = msg.content as string;
         setAiCaption(`(private) ${whisperContent}`);
+        stopSpeaking();
         speak(whisperContent);
+        holdDuck(2_500 + whisperContent.length * 90);
         setTimeout(() => setAiCaption(""), 5000);
         toast({ title: " Private help from Sahayak", description: whisperContent.slice(0, 100) });
         break;
+      }
       case "GAP_ALERT":
         setGapAlert({
           concept: msg.concept as string,
@@ -158,18 +189,36 @@ export default function ClassroomRoom() {
         setQuizActive(true);
         setQuizTarget(msg.target_student_id as string);
         setAiCaption(`Quiz for ${msg.target_name}: ${msg.content}`);
-        if (!msg.via_channel) speak(msg.content as string);
+        stopSpeaking();
+        if (!msg.via_channel) {
+          speak(msg.content as string);
+          holdDuck(2_500 + (msg.content as string).length * 90);
+        } else {
+          holdDuck(120_000);
+        }
         break;
       case "QUIZ_RESULT":
         setQuizActive(false);
         setAiCaption(msg.content as string);
-        if (!msg.via_channel) speak(msg.content as string);
+        stopSpeaking();
+        if (!msg.via_channel) {
+          speak(msg.content as string);
+          holdDuck(2_500 + (msg.content as string).length * 90);
+        } else {
+          holdDuck(120_000);
+        }
         setTimeout(() => setAiCaption(""), 5000);
+        break;
+      case "AI_VOICE":
+        // The AI's voice is flowing into the live audio channel right now.
+        setAiVoiceSpeaking(Boolean(msg.speaking));
         break;
       case "SESSION_ENDED":
         setSessionEnded(true);
         setInsights(msg.insights);
+        setAiVoiceSpeaking(false);
         stopSpeaking();
+        releaseDuck();
         break;
     }
   }, [toast]);
@@ -181,12 +230,26 @@ export default function ClassroomRoom() {
     status: agoraStatus,
     peers: agoraPeers,
     error: agoraError,
+    duckMic,
   } = useAgora({
     channel: `sahayak-${roomId}`,
     uid: userId,
     role,
     enabled: liveAudio,
   });
+
+  useEffect(() => {
+    duckMicRef.current = duckMic;
+  }, [duckMic]);
+
+  // Bridge speech events: exact start/stop of audible frames in the channel.
+  useEffect(() => {
+    if (aiVoiceSpeaking) {
+      holdDuck(120_000); // the stop event below releases it (with tail grace)
+    } else {
+      holdDuck(2_500); // tail silence + transport still in flight — un-duck late
+    }
+  }, [aiVoiceSpeaking, holdDuck]);
 
   // Tell the backend whether this participant is in the live audio channel so
   // it knows when to broadcast Sahayak's voice into it.
@@ -211,6 +274,21 @@ export default function ClassroomRoom() {
 
   const { isListening, isSupported, error: speechError, start: startListening, stop: stopListening, interimTranscript } =
     useSpeechRecognition(handleFinalResult);
+
+  // While the AI's voice plays out loud, pause speech recognition so the
+  // browser mic never transcribes the AI's own voice as a new utterance
+  // (which would make Sahayak answer itself). Resume when it finishes.
+  const wasListeningBeforeAI = useRef(false);
+  useEffect(() => {
+    if (aiVoiceSpeaking) {
+      wasListeningBeforeAI.current = isListening;
+      if (isListening) stopListening();
+    } else if (wasListeningBeforeAI.current) {
+      wasListeningBeforeAI.current = false;
+      if (isSupported) startListening();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiVoiceSpeaking]);
 
   // ─── Auto-scroll transcript ─────────────────────────────
   useEffect(() => {

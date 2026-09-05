@@ -35,6 +35,53 @@ _lock = threading.Lock()
 _proc: subprocess.Popen | None = None
 _id_counter = 0
 
+# Bridge responses, filed by command id, plus a condition to wake waiters.
+_pending: dict[str, dict | None] = {}
+_cv = threading.Condition()
+# Listeners called (from the reader thread) with (channel, speaking) whenever
+# the bridge starts/stops pushing audible frames into a channel.
+_speech_listeners: list = []
+
+
+def add_speech_listener(cb) -> None:
+    """Register cb(channel: str, speaking: bool) for AI voice start/stop."""
+    with _cv:
+        if cb not in _speech_listeners:
+            _speech_listeners.append(cb)
+
+
+def _dispatch_event(ev: dict) -> None:
+    if ev.get("event") != "speech":
+        return
+    channel = ev.get("channel", "")
+    speaking = ev.get("state") == "start"
+    with _cv:
+        listeners = list(_speech_listeners)
+    for cb in listeners:
+        try:
+            cb(channel, speaking)
+        except Exception:  # noqa: BLE001
+            logger.exception("speech listener crashed")
+
+
+def _reader_loop() -> None:
+    """Single owner of bridge stdout: files responses, dispatches events."""
+    proc = _proc
+    while proc is not None and proc.poll() is None:
+        line = proc.stdout.readline()
+        if not line:
+            break
+        try:
+            msg = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if "event" in msg:
+            _dispatch_event(msg)
+            continue
+        with _cv:
+            _pending[msg.get("id", "")] = msg
+            _cv.notify_all()
+
 
 def available() -> bool:
     return bool(AGORA_APP_ID and AGORA_APP_CERTIFICATE) and os.path.exists(BRIDGE_SCRIPT)
@@ -56,27 +103,24 @@ def _start() -> bool:
                 text=True,
                 bufsize=1,
             )
-            return True
         except FileNotFoundError as e:
             logger.error("cannot start voice bridge (%s)", e)
             _proc = None
             return False
+        threading.Thread(target=_reader_loop, daemon=True, name="bridge-reader").start()
+        return True
 
 
 def _respond(cmd_id: str, timeout_ms: int = 60000):
-    global _proc
     deadline = time.time() + timeout_ms / 1000
-    while time.time() < deadline:
-        line = _proc.stdout.readline()
-        if not line:
-            return None
-        try:
-            resp = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if resp.get("id") == cmd_id:
-            return resp
-    return None
+    with _cv:
+        while True:
+            if cmd_id in _pending:
+                return _pending.pop(cmd_id)
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                return None
+            _cv.wait(remaining)
 
 
 def _command(cmd: dict, timeout_ms: int = 60000) -> dict:

@@ -8,6 +8,7 @@ import os
 import json
 import io
 import uuid
+import asyncio
 import logging
 import subprocess
 import tempfile
@@ -142,6 +143,50 @@ async def synthesize_speech(text: str, lang: str = "en-IN"):
 @app.on_event("shutdown")
 async def _shutdown():
     agora_voice.shutdown()
+
+
+# ─── AI voice state (drives client mic-ducking) ────────────────────
+
+_MAIN_LOOP: asyncio.AbstractEventLoop | None = None
+_ai_voice_listener_installed = False
+
+
+def _room_for_channel(channel: str) -> Room | None:
+    """Map an Agora channel name back to its Room (channel names are lowercased)."""
+    if not channel.startswith("sahayak-"):
+        return None
+    room_id = channel[len("sahayak-"):]
+    room = registry.get_room(room_id)
+    if room:
+        return room
+    for rid, r in registry.rooms.items():
+        if agora_channel_for(rid) == channel:
+            return r
+    return None
+
+
+def _on_ai_speech(channel: str, speaking: bool):
+    """Bridge event: the AI's voice started/stopped flowing into a channel."""
+    room = _room_for_channel(channel)
+    loop = _MAIN_LOOP
+    if not room or loop is None:
+        return
+    try:
+        asyncio.run_coroutine_threadsafe(
+            room.broadcast({"type": "AI_VOICE", "speaking": speaking}), loop
+        )
+        logger.info("ai voice %s → %s", "start" if speaking else "stop", channel)
+    except Exception:  # noqa: BLE001
+        logger.exception("ai voice event dispatch failed")
+
+
+@app.on_event("startup")
+async def _startup():
+    global _MAIN_LOOP, _ai_voice_listener_installed
+    _MAIN_LOOP = asyncio.get_running_loop()
+    if not _ai_voice_listener_installed:
+        agora_voice.add_speech_listener(_on_ai_speech)
+        _ai_voice_listener_installed = True
 
 
 # ─── Agora RTC token (live classroom audio) ───────────────────────
