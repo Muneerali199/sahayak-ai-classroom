@@ -357,7 +357,7 @@ export default function ClassroomRoom() {
             <div>
               <h1 className="font-bold text-lg">Sahayak Live</h1>
               <p className="text-xs text-white/50">
-                Room: {roomId} <span className="text-white/25">· a5</span>
+                Room: {roomId} <span className="text-white/25">· a6</span>
               </p>
             </div>
           </div>
@@ -395,10 +395,10 @@ export default function ClassroomRoom() {
             >
               <Radio className={`w-4 h-4 mr-1 ${agoraStatus === "joined" ? "animate-pulse" : ""}`} />
               {agoraStatus === "joined"
-                ? `Live · ${agoraPeers.length + 1} in audio`
+                ? `Agora Live · ${agoraPeers.length + 1} in audio`
                 : agoraStatus === "joining"
-                ? "Joining audio..."
-                : "Live Audio"}
+                ? "Joining Agora..."
+                : "Live Audio (Agora)"}
             </Button>
             <div className={`w-2 h-2 rounded-full ${status === "connected" ? "bg-green-400" : "bg-red-400"}`} />
             <span className="text-xs text-white/50">
@@ -461,6 +461,19 @@ export default function ClassroomRoom() {
             <Users className="w-3 h-3" /> Participants ({participants.length})
           </h3>
           <div className="space-y-2">
+            {aiOnline && (
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                <div className="w-8 h-8 rounded-full bg-purple-500/30 flex items-center justify-center">
+                  <Radio className="w-4 h-4 text-purple-300" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">Sahayak AI</p>
+                  <p className="text-xs text-purple-300/70">
+                    {aiVoiceSpeaking ? "speaking · agora" : "live · agora"}
+                  </p>
+                </div>
+              </div>
+            )}
             {participants.map((p) => (
               <div key={p.user_id} className="flex items-center gap-2 p-2 rounded-lg bg-white/5">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${

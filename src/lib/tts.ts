@@ -44,6 +44,11 @@ async function probeBackend(): Promise<boolean> {
   return backendAvailable;
 }
 
+// Local fallback playback volume. Matches the live-channel loudness
+// (bridge gain 0.35 × browser track ~0.4) so the AI is never 3× louder on
+// devices that fall back to local TTS than on the Agora channel.
+const LOCAL_TTS_VOLUME = 0.35;
+
 function playAudio(src: string, onError: () => void) {
   if (!audioEl) {
     audioEl = new Audio();
@@ -51,6 +56,7 @@ function playAudio(src: string, onError: () => void) {
   audioEl.pause();
   audioEl.src = src;
   audioEl.playbackRate = 1;
+  audioEl.volume = LOCAL_TTS_VOLUME;
   audioEl.onerror = () => onError();
   audioEl.play().catch(onError);
 }

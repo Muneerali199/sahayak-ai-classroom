@@ -13,7 +13,7 @@ const BACKEND = "http://127.0.0.1:8001";
 // the browser to avoid ear-blasting; classroom echo-cancellation (AEC) is set
 // on the local mic track so the AI voice doesn't loop back into the channel.
 const AI_UID = Number(process.env.NEXT_PUBLIC_AGORA_AI_UID) || 1396787265;
-const AI_TRACK_VOLUME = Number(process.env.NEXT_PUBLIC_AGORA_AI_VOLUME) || 55; // 0-100
+const AI_TRACK_VOLUME = Number(process.env.NEXT_PUBLIC_AGORA_AI_VOLUME) || 40; // 0-100
 
 type AgoraStatus = "idle" | "joining" | "joined" | "error";
 

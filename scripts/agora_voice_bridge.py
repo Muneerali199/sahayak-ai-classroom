@@ -20,6 +20,7 @@ import io
 import json
 import logging
 import os
+import re
 import struct
 import sys
 import threading
@@ -52,10 +53,18 @@ logger = logging.getLogger(__name__)
 PUSH_RATE = int(os.environ.get("AGORA_PUSH_RATE", "16000"))  # Agora's standard custom-PCM pipeline rate
 PUSH_CHANNELS = 1
 # Audio kept queued in the sender ahead of playback (ms). The speech
-# publisher and the silence keeper both hold this much lead so the sender
+# publisher and the keep-alive feeder both hold this much lead so the sender
 # never starves on scheduler hiccups (starvation = receiver-side loss
 # concealment = the "background voice" artifact).
-LEAD_MS = 200
+LEAD_MS = 250
+# Between broadcasts, feed a very low-level noise floor instead of digital
+# silence. Agora's server-side level monitor flags pure silence as
+# AUDIO_OUTPUT_LEVEL_TOO_LOW and its recovery transition corrupts the first
+# moments of the next speech (audible bursts). A -50 dB dither keeps the
+# stream "live" for the monitor while staying inaudible to listeners
+# (further attenuated by AI_VOLUME and the browser's track volume).
+DITHER_AMP = int(os.environ.get("AGORA_KEEPALIVE_LEVEL", "200"))  # int16 amplitude
+KEEPER_CUSHION_MS = 150
 AI_UID = int(os.environ.get("AGORA_AI_UID", "1396787265"))
 # Piper/edge outputs are near full-scale; scale down before pushing so
 # listeners never get blasted. 0.35 ≈ −9 dB of headroom.
@@ -164,12 +173,12 @@ class Broadcaster:
         self._service: AgoraService | None = None
         self._conns: dict[str, tuple] = {}  # channel -> (connection, last_used_ts)
         self._publish_locks: dict[str, threading.Lock] = {}  # one broadcast at a time per channel
-        self._keepers: dict[str, threading.Event] = {}  # channel -> stop event for silence keeper
+        self._keepers: dict[str, threading.Event] = {}  # channel -> stop event for the dither feeder
         # Shared per-channel stream clock: t0 = when audio first flowed,
-        # pos_ms = total ms of audio (speech + silence) written so far. Both
-        # the speech publisher and the silence keeper write against this
-        # clock so the sender buffer always holds a healthy cushion — never
-        # zero, never unbounded.
+        # pos_ms = total ms of audio written so far (speech + dither). Both
+        # the speech publisher and the dither feeder write against this clock
+        # so the sender buffer always holds a healthy cushion — never zero,
+        # never an unbounded burst.
         self._stream_t0: dict[str, float] = {}
         self._stream_pos_ms: dict[str, float] = {}
         self._stop = False
@@ -252,25 +261,25 @@ class Broadcaster:
             return conn
 
     def _keeper_loop(self, channel: str, stop_evt: threading.Event):
-        """Keep the AI's audio track published between broadcasts.
+        """Feed a low-level dither between broadcasts.
 
-        The native SDK unpublishes a custom PCM track a few seconds after its
-        data stops ("stream removed"), and every re-publish tears down and
-        recreates the audio element on each client — audible glitches. A
-        trickle of silence keeps the track alive, exactly like a real mic.
+        Two jobs: (1) keep the custom PCM track published (the native SDK
+        unpublishes it seconds after its data stops — every re-publish churns
+        audio elements on all clients) and (2) keep the stream's level above
+        the server's AUDIO_OUTPUT_LEVEL_TOO_LOW threshold, whose recovery
+        transition corrupts the onset of the next speech. The dither is
+        ~-50 dB before AI_VOLUME/browser attenuation — inaudible.
 
-        Pacing: writes against the shared stream clock, holding the sender
-        buffer CUSHION_MS ahead of playback. Pushing silence at exactly
-        real-time with no cushion starves the sender on any scheduler hiccup
-        and the receiver's loss concealment then produces garbage — the
-        "background voice" under AI speech.
+        Paced against the shared stream clock with a small cushion so the
+        sender never starves (starvation = receiver concealment garbage).
         """
+        import random
         conn = self._conns.get(channel, (None,))[0]
         if conn is None:
             return
         unit_ms = 100
-        cushion_ms = 400
-        silence = b"\x00" * int(PUSH_RATE * PUSH_CHANNELS * 2 * unit_ms // 1000)
+        samples_per_unit = PUSH_RATE * PUSH_CHANNELS * unit_ms // 1000
+        rng = random.Random(0x5A4A594B)  # deterministic per-run
         while not stop_evt.is_set() and not self._stop:
             stop_evt.wait(0.05)
             if stop_evt.is_set() or self._stop:
@@ -281,8 +290,9 @@ class Broadcaster:
                     break  # connection was released
                 self._conns[channel] = (conn, time.time())  # keeper = alive
                 t0 = self._stream_t0.get(channel)
+                pos = self._stream_pos_ms.get(channel, 0.0)
             if t0 is None:
-                continue  # stream not started yet — first speech starts it
+                continue  # stream not started — first speech starts the clock
             pub_lock = self._publish_locks.get(channel)
             if pub_lock is None:
                 continue
@@ -294,11 +304,16 @@ class Broadcaster:
                     pos = self._stream_pos_ms.get(channel, 0.0)
                 if t0 is None:
                     continue
-                target = (time.time() - t0) * 1000 + cushion_ms
+                target = (time.time() - t0) * 1000 + KEEPER_CUSHION_MS
                 pushed = False
                 while pos + unit_ms <= target:
+                    chunk = struct.pack(
+                        f"<{samples_per_unit}h",
+                        *(rng.randint(-DITHER_AMP, DITHER_AMP)
+                          for _ in range(samples_per_unit // PUSH_CHANNELS))
+                    )
                     conn.push_audio_pcm_data(
-                        bytearray(silence), PUSH_RATE, PUSH_CHANNELS, 0
+                        bytearray(chunk), PUSH_RATE, PUSH_CHANNELS, 0
                     )
                     pos += unit_ms
                     pushed = True
@@ -309,7 +324,7 @@ class Broadcaster:
                 pass
             finally:
                 pub_lock.release()
-        logger.info("silence keeper stopped for %s", channel)
+        logger.info("dither keeper stopped for %s", channel)
 
     def _release(self, channel: str):
         with self._lock:
@@ -352,21 +367,23 @@ class Broadcaster:
             pcm = _append_silence(pcm, rate, TAIL_SILENCE_MS)
             pcm = _pad_to_10ms(pcm, rate, channels)
             conn = self._get_connection(channel, token)
-            # Write against the shared stream clock (same one the silence
-            # keeper uses), keeping LEAD_MS of audio queued ahead of playback.
-            # A zero-lead push schedule starves the sender on any scheduler
-            # hiccup and listeners hear concealment garbage mid-speech.
+            # Pace against the shared stream clock (the same one the dither
+            # feeder advances), holding LEAD_MS of audio queued ahead of
+            # playback. If the clock has badly lagged wall time (feeder died
+            # or the channel sat idle past the dither's coverage), reset it
+            # so this broadcast streams paced instead of bursting.
             bytes_per_ms = rate * channels * 2 / 1000
             total_ms = len(pcm) / bytes_per_ms
             with self._lock:
                 t0 = self._stream_t0.get(channel)
-                if t0 is None:
+                pos = self._stream_pos_ms.get(channel, 0.0)
+                if t0 is None or (time.time() - t0) * 1000 - pos > 1000:
                     t0 = time.time()
+                    pos = 0.0
                     self._stream_t0[channel] = t0
                     self._stream_pos_ms[channel] = 0.0
-                pos_start = self._stream_pos_ms.get(channel, 0.0)
+            pos_start = pos
             end_ms = pos_start + total_ms
-            pos = pos_start
             _emit({"event": "speech", "channel": channel, "state": "start"})
             try:
                 while pos < end_ms and not self._stop:
@@ -427,11 +444,31 @@ def _emit(event: dict):
 
 # ─── Command handlers ────────────────────────────────────────────────
 
+def _tts_clean(text: str) -> str:
+    """Strip markdown so the voice reads sentences, not symbols.
+
+    Piped-in replies often contain bullet dashes, asterisks, numbering and
+    em-dashes that TTS voices pronounce harshly or as garbage ("dash dash").
+    """
+    t = re.sub(r"```.*?```", " ", text, flags=re.S)          # code blocks
+    t = re.sub(r"`([^`]*)`", r"\1", t)                       # inline code
+    t = re.sub(r"[*_#>|]+", " ", t)                          # md emphasis/headers
+    t = re.sub(r"^\s*[-–—•·]+\s*", " ", t, flags=re.M)       # bullet markers
+    t = re.sub(r"\s+[-–—]\s+", ", ", t)                      # mid-sentence dashes → pause
+    t = re.sub(r"^\s*\d+[\.\)]\s*", " ", t, flags=re.M)      # list numbering
+    t = re.sub(r"[èé]{2,}", "", t)                           # stray symbol runs
+    t = re.sub(r"\s{2,}", " ", t).strip()
+    return t
+
+
 def handle_speak(cmd: dict) -> dict:
     text = cmd.get("text", "")
     if not text:
         return {"ok": False, "error": "empty text"}
     rate_push = int(cmd.get("rate", PUSH_RATE))
+    text = _tts_clean(text)
+    if not text:
+        return {"ok": False, "error": "empty after cleanup"}
     wav, _ = synthesize(text, cmd.get("lang"))
     pcm, rate = _decode_wav(wav)
     pcm = _resample(pcm, rate, rate_push)
