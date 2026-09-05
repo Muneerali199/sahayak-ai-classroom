@@ -345,7 +345,7 @@ export default function ClassroomRoom() {
             <div>
               <h1 className="font-bold text-lg">Sahayak Live</h1>
               <p className="text-xs text-white/50">
-                Room: {roomId} <span className="text-white/25">· a3</span>
+                Room: {roomId} <span className="text-white/25">· a4</span>
               </p>
             </div>
           </div>

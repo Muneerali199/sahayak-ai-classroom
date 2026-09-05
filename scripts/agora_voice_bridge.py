@@ -51,7 +51,11 @@ logger = logging.getLogger(__name__)
 
 PUSH_RATE = int(os.environ.get("AGORA_PUSH_RATE", "16000"))  # Agora's standard custom-PCM pipeline rate
 PUSH_CHANNELS = 1
-FRAME_MS = 50
+# Audio kept queued in the sender ahead of playback (ms). The speech
+# publisher and the silence keeper both hold this much lead so the sender
+# never starves on scheduler hiccups (starvation = receiver-side loss
+# concealment = the "background voice" artifact).
+LEAD_MS = 200
 AI_UID = int(os.environ.get("AGORA_AI_UID", "1396787265"))
 # Piper/edge outputs are near full-scale; scale down before pushing so
 # listeners never get blasted. 0.35 ≈ −9 dB of headroom.
@@ -161,6 +165,13 @@ class Broadcaster:
         self._conns: dict[str, tuple] = {}  # channel -> (connection, last_used_ts)
         self._publish_locks: dict[str, threading.Lock] = {}  # one broadcast at a time per channel
         self._keepers: dict[str, threading.Event] = {}  # channel -> stop event for silence keeper
+        # Shared per-channel stream clock: t0 = when audio first flowed,
+        # pos_ms = total ms of audio (speech + silence) written so far. Both
+        # the speech publisher and the silence keeper write against this
+        # clock so the sender buffer always holds a healthy cushion — never
+        # zero, never unbounded.
+        self._stream_t0: dict[str, float] = {}
+        self._stream_pos_ms: dict[str, float] = {}
         self._stop = False
         threading.Thread(target=self._reaper, daemon=True).start()
 
@@ -244,17 +255,24 @@ class Broadcaster:
         """Keep the AI's audio track published between broadcasts.
 
         The native SDK unpublishes a custom PCM track a few seconds after its
-        data stops ("stream removed"). Every re-publish cycle tears down and
-        recreates the audio element on every client — those transitions are
-        audible glitches (the mid-speech "background bad voice"). Pushing a
+        data stops ("stream removed"), and every re-publish tears down and
+        recreates the audio element on each client — audible glitches. A
         trickle of silence keeps the track alive, exactly like a real mic.
+
+        Pacing: writes against the shared stream clock, holding the sender
+        buffer CUSHION_MS ahead of playback. Pushing silence at exactly
+        real-time with no cushion starves the sender on any scheduler hiccup
+        and the receiver's loss concealment then produces garbage — the
+        "background voice" under AI speech.
         """
         conn = self._conns.get(channel, (None,))[0]
         if conn is None:
             return
-        silence = b"\x00" * int(PUSH_RATE * PUSH_CHANNELS * 2 * 0.1)  # 100ms
+        unit_ms = 100
+        cushion_ms = 400
+        silence = b"\x00" * int(PUSH_RATE * PUSH_CHANNELS * 2 * unit_ms // 1000)
         while not stop_evt.is_set() and not self._stop:
-            stop_evt.wait(0.1)
+            stop_evt.wait(0.05)
             if stop_evt.is_set() or self._stop:
                 break
             with self._lock:
@@ -262,17 +280,34 @@ class Broadcaster:
                 if not entry or entry[0] is not conn:
                     break  # connection was released
                 self._conns[channel] = (conn, time.time())  # keeper = alive
-            with self._lock:
-                pub_lock = self._publish_locks.get(channel)
+                t0 = self._stream_t0.get(channel)
+            if t0 is None:
+                continue  # stream not started yet — first speech starts it
+            pub_lock = self._publish_locks.get(channel)
             if pub_lock is None:
                 continue
-            if pub_lock.acquire(blocking=False):
-                # Speech broadcast not in flight — top the track up with
-                # silence so the SDK never sees an empty sender buffer.
-                try:
-                    conn.push_audio_pcm_data(bytearray(silence), PUSH_RATE, PUSH_CHANNELS, 0)
-                except Exception:  # noqa: BLE001
-                    pass
+            if not pub_lock.acquire(blocking=False):
+                continue  # a speech broadcast is in flight
+            try:
+                with self._lock:
+                    t0 = self._stream_t0.get(channel)
+                    pos = self._stream_pos_ms.get(channel, 0.0)
+                if t0 is None:
+                    continue
+                target = (time.time() - t0) * 1000 + cushion_ms
+                pushed = False
+                while pos + unit_ms <= target:
+                    conn.push_audio_pcm_data(
+                        bytearray(silence), PUSH_RATE, PUSH_CHANNELS, 0
+                    )
+                    pos += unit_ms
+                    pushed = True
+                if pushed:
+                    with self._lock:
+                        self._stream_pos_ms[channel] = pos
+            except Exception:  # noqa: BLE001
+                pass
+            finally:
                 pub_lock.release()
         logger.info("silence keeper stopped for %s", channel)
 
@@ -280,6 +315,9 @@ class Broadcaster:
         with self._lock:
             entry = self._conns.pop(channel, None)
             evt = self._keepers.pop(channel, None)
+            # Reset the stream clock: a future rejoin starts a fresh stream.
+            self._stream_t0.pop(channel, None)
+            self._stream_pos_ms.pop(channel, None)
         if evt:
             evt.set()
         if not entry:
@@ -314,36 +352,47 @@ class Broadcaster:
             pcm = _append_silence(pcm, rate, TAIL_SILENCE_MS)
             pcm = _pad_to_10ms(pcm, rate, channels)
             conn = self._get_connection(channel, token)
-            # Mirrors the SDK's own AudioConsumer pacing (10ms frame units,
-            # ~200ms pushed ahead of the playback clock): without this lead
-            # any scheduler hiccup starves the encoder and listeners hear
-            # glitches mid-speech.
+            # Write against the shared stream clock (same one the silence
+            # keeper uses), keeping LEAD_MS of audio queued ahead of playback.
+            # A zero-lead push schedule starves the sender on any scheduler
+            # hiccup and listeners hear concealment garbage mid-speech.
             bytes_per_ms = rate * channels * 2 / 1000
-            unit_ms = 10
-            lead_ms = 200
             total_ms = len(pcm) / bytes_per_ms
-            start = time.time()
-            pushed_ms = 0.0
+            with self._lock:
+                t0 = self._stream_t0.get(channel)
+                if t0 is None:
+                    t0 = time.time()
+                    self._stream_t0[channel] = t0
+                    self._stream_pos_ms[channel] = 0.0
+                pos_start = self._stream_pos_ms.get(channel, 0.0)
+            end_ms = pos_start + total_ms
+            pos = pos_start
             _emit({"event": "speech", "channel": channel, "state": "start"})
             try:
-                while pushed_ms < total_ms and not self._stop:
-                    elapsed_ms = (time.time() - start) * 1000
-                    target_ms = min(elapsed_ms + lead_ms, total_ms)
-                    while pushed_ms < target_ms:
-                        n_ms = min(unit_ms, total_ms - pushed_ms)
-                        i0 = int(round(pushed_ms * bytes_per_ms))
-                        i1 = int(round((pushed_ms + n_ms) * bytes_per_ms))
+                while pos < end_ms and not self._stop:
+                    elapsed_ms = (time.time() - t0) * 1000
+                    target = min(end_ms, elapsed_ms + LEAD_MS)
+                    while pos < target:
+                        n_ms = min(10, end_ms - pos)
+                        i0 = int(round((pos - pos_start) * bytes_per_ms))
+                        i1 = int(round((pos - pos_start + n_ms) * bytes_per_ms))
                         conn.push_audio_pcm_data(
                             bytearray(pcm[i0:i1]), rate, channels, 0
                         )
-                        pushed_ms += n_ms
+                        pos += n_ms
+                    with self._lock:
+                        self._stream_pos_ms[channel] = pos
                     time.sleep(0.004)
-            finally:
                 # Hold the stream open briefly after the last frame so the
                 # SDK's sender drains cleanly (no abrupt cut artifact).
                 time.sleep(0.25)
                 _emit({"event": "speech", "channel": channel, "state": "stop"})
-            return pushed_ms / 1000.0
+            finally:
+                with self._lock:
+                    self._stream_pos_ms[channel] = max(
+                        self._stream_pos_ms.get(channel, 0.0), pos
+                    )
+            return total_ms / 1000.0
 
     def shutdown(self):
         self._stop = True
