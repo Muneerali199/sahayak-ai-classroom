@@ -178,11 +178,17 @@ export default function AudioVisualExplanation() {
               />
             </div>
 
-            <div>
-              <audio controls src={result.audioDataUri} className="w-full">
-                Your browser does not support the audio element.
-              </audio>
-            </div>
+            {result.audioDataUri ? (
+              <div>
+                <audio controls src={result.audioDataUri} className="w-full">
+                  Your browser does not support the audio element.
+                </audio>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground border border-dashed border-border p-3 rounded-md text-center">
+                Spoken audio requires the local Sahayak backend — the explanation and visual above are fully generated.
+              </p>
+            )}
 
             <div>
               <h4 className="font-semibold mb-2">Explanation Script</h4>

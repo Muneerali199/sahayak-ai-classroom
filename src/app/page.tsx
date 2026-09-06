@@ -5,48 +5,43 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   ArrowRight,
+  AudioLines,
   BrainCircuit,
-  Languages,
-  Paintbrush,
-  BookOpenCheck,
-  Sparkles,
-  CalendarCheck,
-  GitBranch,
-  Github,
-  Linkedin,
-  Twitter,
-  Code2,
-  Cpu,
-  Play,
-  Star,
-  Users,
-  Zap,
-  Heart,
+  CalendarPlus,
   CheckCircle,
+  Cpu,
+  Gamepad2,
   Globe,
-  BookOpen,
-  PenTool,
-  MessageCircle,
-  Award,
-  TrendingUp,
-  Shield,
+  Heart,
+  Languages,
+  MonitorPlay,
+  Paintbrush,
+  Play,
+  Presentation,
+  Rabbit,
+  Radio,
+  ShieldCheck,
+  Signal,
+  Sparkles,
+  Star,
+  UsersRound,
+  Volume2,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Logo } from "@/components/icons";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { useIsMobile } from "@/hooks/use-mobile";
 
-// Enhanced animations with framer-motion-like behavior using CSS
-const MotionDiv = ({ 
-  children, 
-  className = "", 
-  delay = 0, 
-  ...props 
-}: { 
-  children: React.ReactNode; 
-  className?: string; 
+// Scroll-reveal wrapper (IntersectionObserver, no deps)
+const MotionDiv = ({
+  children,
+  className = "",
+  delay = 0,
+  ...props
+}: {
+  children: React.ReactNode;
+  className?: string;
   delay?: number;
   [key: string]: any;
 }) => {
@@ -62,11 +57,7 @@ const MotionDiv = ({
       },
       { threshold: 0.1 }
     );
-
-    if (ref.current) {
-      observer.observe(ref.current);
-    }
-
+    if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
   }, [delay]);
 
@@ -74,9 +65,7 @@ const MotionDiv = ({
     <div
       ref={ref}
       className={`transition-all duration-700 ${
-        isVisible 
-          ? 'opacity-100 translate-y-0' 
-          : 'opacity-0 translate-y-8'
+        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
       } ${className}`}
       {...props}
     >
@@ -85,704 +74,609 @@ const MotionDiv = ({
   );
 };
 
+const usps = [
+  {
+    icon: <Signal className="w-6 h-6" />,
+    title: "Floor Manager",
+    tag: "Turn-Taking FSM",
+    description:
+      "A live state machine models who owns the floor. The AI is physically gated — it can never interrupt the teacher or a speaking student.",
+    gradient: "from-violet-500 to-purple-600",
+  },
+  {
+    icon: <BrainCircuit className="w-6 h-6" />,
+    title: "Gap Radar",
+    tag: "Live Clustering",
+    description:
+      "Every confused utterance is clustered by concept. When 2+ students struggle with the same thing, the AI queues a simpler explanation.",
+    gradient: "from-fuchsia-500 to-purple-600",
+  },
+  {
+    icon: <Volume2 className="w-6 h-6" />,
+    title: "Whisper Tutor",
+    tag: "Private + Broadcast",
+    description:
+      "One student stuck while the teacher is mid-sentence? The AI whispers a simpler explanation to that student's screen only.",
+    gradient: "from-indigo-500 to-violet-600",
+  },
+];
+
+const powers = [
+  { icon: <Languages className="w-5 h-5" />, title: "Localized Content", description: "Lessons in Hindi, Marathi, Tamil & 20+ languages." },
+  { icon: <UsersRound className="w-5 h-5" />, title: "Differentiated Materials", description: "Textbook photo → worksheets per grade level." },
+  { icon: <BrainCircuit className="w-5 h-5" />, title: "Instant Knowledge Base", description: "Any concept, explained at the right level." },
+  { icon: <Paintbrush className="w-5 h-5" />, title: "Visual Aid Design", description: "Blackboard-ready diagrams from a prompt." },
+  { icon: <CalendarPlus className="w-5 h-5" />, title: "Weekly Lesson Planner", description: "A full Monday–Sunday plan in seconds." },
+  { icon: <AudioLines className="w-5 h-5" />, title: "Audio Assessments", description: "Hear a student read → fluency & accuracy report." },
+  { icon: <GameGenerationIcon />, title: "Game Generation", description: "Classroom games from any lesson topic." },
+  { icon: <Presentation className="w-5 h-5" />, title: "Audio-Visual Explanations", description: "Spoken lesson + custom visual, together." },
+  { icon: <Rabbit className="w-5 h-5" />, title: "Interactive Storyteller", description: "Stories with character voices & illustrations." },
+];
+
+function GameGenerationIcon() {
+  return <Gamepad2 className="w-5 h-5" />;
+}
+
+const stats = [
+  { value: "9", label: "AI Agents in Every Class" },
+  { value: "20+", label: "Indian Languages" },
+  { value: "3", label: "Explanation Levels per Answer" },
+  { value: "0", label: "Interruptions of the Teacher" },
+];
+
+const team = [
+  { name: "Stuti Mishra", role: "Full Stack Developer", gradient: "from-violet-500 to-purple-600" },
+  { name: "Amitesh", role: "Backend Developer", gradient: "from-fuchsia-500 to-purple-600" },
+  { name: "Amardeep", role: "AI Specialist", gradient: "from-indigo-500 to-violet-600" },
+  { name: "Kapil", role: "UI/UX Designer", gradient: "from-purple-500 to-pink-500" },
+  { name: "Ayush", role: "Deploy Manager", gradient: "from-violet-600 to-indigo-500" },
+  { name: "Pratyush", role: "QA Tester", gradient: "from-fuchsia-600 to-violet-500" },
+];
+
+const testimonials = [
+  {
+    name: "Priya Sharma",
+    role: "Primary School Teacher",
+    content: "Sahayak sits in my class like a second teacher. It waited for a pause, then explained fractions to Rahul in Hindi — privately. He smiled. I kept teaching.",
+    avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b4c6?w=150&h=150&fit=crop&crop=face",
+  },
+  {
+    name: "Rajesh Kumar",
+    role: "Mathematics Teacher",
+    content: "The visual aids and differentiated worksheets save me hours. I photographed one textbook page and got three grade-level versions with diagrams.",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+  },
+  {
+    name: "Anita Desai",
+    role: "English Teacher",
+    content: "Finally, an AI that understands the Indian classroom. It speaks when it should, stays silent when it must, and whispers to the child who needs help.",
+    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
+  },
+];
+
 export default function LandingPage() {
-  const followerRef = React.useRef<HTMLDivElement>(null);
-  const isMobile = useIsMobile();
-  const [mousePosition, setMousePosition] = React.useState({ x: 0, y: 0 });
-
-  React.useEffect(() => {
-    if (isMobile) return;
-
-    const handleMouseMove = (event: MouseEvent) => {
-      setMousePosition({ x: event.clientX, y: event.clientY });
-      if (followerRef.current) {
-        const { clientX, clientY } = event;
-        followerRef.current.style.transform = `translate(${clientX}px, ${clientY}px) translate(-50%, -50%)`;
-      }
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-    };
-  }, [isMobile]);
-
-  const features = [
-    {
-      icon: <Languages className="w-8 h-8" />,
-      title: "Localized Content Generation",
-      description: "Create stories and examples in Hindi, Marathi, and more from a simple prompt.",
-      color: "from-blue-500 to-cyan-500",
-    },
-    {
-      icon: <BookOpenCheck className="w-8 h-8" />,
-      title: "Differentiated Materials", 
-      description: "Generate multiple versions of a worksheet from a textbook photo for different grade levels.",
-      color: "from-purple-500 to-pink-500",
-    },
-    {
-      icon: <BrainCircuit className="w-8 h-8" />,
-      title: "Instant Knowledge Base",
-      description: "Get simple, clear explanations for complex student questions with voice or text.",
-      color: "from-emerald-500 to-teal-500",
-    },
-    {
-      icon: <Paintbrush className="w-8 h-8" />,
-      title: "Visual Aid Design",
-      description: "Describe a concept and get a simple visual aid you can draw on a blackboard.",
-      color: "from-orange-500 to-red-500",
-    },
-    {
-      icon: <CalendarCheck className="w-8 h-8" />,
-      title: "Weekly Lesson Planner",
-      description: "Automate the creation of structured weekly lesson plans for any topic and grade.",
-      color: "from-indigo-500 to-purple-500",
-    },
-    {
-      icon: <Sparkles className="w-8 h-8" />,
-      title: "And much more...",
-      description: "From audio assessments to on-the-fly game generation, Sahayak is your all-in-one assistant.",
-      color: "from-yellow-500 to-orange-500",
-    },
-  ];
-
-  const stats = [
-    { value: "10K+", label: "Teachers Helped", icon: <Users className="w-6 h-6" /> },
-    { value: "50K+", label: "Lessons Created", icon: <BookOpen className="w-6 h-6" /> },
-    { value: "25+", label: "Languages Supported", icon: <Globe className="w-6 h-6" /> },
-    { value: "99.9%", label: "Uptime", icon: <Shield className="w-6 h-6" /> },
-  ];
-
-  const techStack = [
-    {
-      name: 'Next.js',
-      logo: (
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gray-900 to-gray-700 flex items-center justify-center text-white font-bold">
-          N
-        </div>
-      )
-    },
-    {
-      name: 'React',
-      logo: (
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white">
-          <div className="w-8 h-8 border-2 border-current rounded-full relative">
-            <div className="absolute inset-0 border border-current rounded-full transform rotate-45"></div>
-            <div className="absolute inset-0 border border-current rounded-full transform -rotate-45"></div>
-          </div>
-        </div>
-      )
-    },
-    {
-      name: 'Tailwind CSS',
-      logo: (
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center text-white font-bold">
-          T
-        </div>
-      )
-    },
-    {
-      name: 'Firebase',
-      logo: (
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center text-white">
-          <div className="w-6 h-6 bg-current rounded transform rotate-12"></div>
-        </div>
-      )
-    },
-    {
-      name: 'Google AI',
-      logo: (
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center text-white">
-          <Sparkles className="w-6 h-6" />
-        </div>
-      )
-    },
-    {
-      name: 'Genkit',
-      logo: (
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white">
-          <GitBranch className="w-6 h-6" />
-        </div>
-      )
-    }
-  ];
-
-  const teamMembers = [
-    {
-      name: "Stuti mishra",
-      role: "Full Stack Developer",
-      icon: <Code2 className="w-8 h-8" />,
-      gradient: "from-blue-500 to-purple-500",
-      social: {
-        github: "https://github.com/Muneerali199",
-        linkedin: "https://linkedin.com/in/muneer-ali",
-        twitter: "https://twitter.com/Muneerali199"
-      }
-    },
-    {
-      name: "Amitesh",
-      role: "Backend Developer",
-      icon: <Cpu className="w-8 h-8" />,
-      gradient: "from-emerald-500 to-teal-500",
-      social: {
-        github: "https://github.com/Mohammad-Ehshan/",
-        linkedin: "https://linkedin.com/in/mohammad-ehshan-4362a0298/",
-        twitter: "https://twitter.com"
-      }
-    },
-    {
-      name: "Amardeep",
-      role: "AI Specialist",
-      icon: <BrainCircuit className="w-8 h-8" />,
-      gradient: "from-pink-500 to-orange-500",
-      social: {
-        github: "https://github.com/Stutyay",
-        linkedin: "https://linkedin.com/in/stuti-gupta-256839293/",
-        twitter: "https://twitter.com"
-      }
-    },
-    {
-      name: "kapil",
-      role: "ui ux designer",
-      icon: <BrainCircuit className="w-8 h-8" />,
-      gradient: "from-pink-500 to-orange-500",
-      social: {
-        github: "https://github.com/Stutyay",
-        linkedin: "https://linkedin.com/in/stuti-gupta-256839293/",
-        twitter: "https://twitter.com"
-      }
-    },
-     {
-      name: "Ayush",
-      role: "deploy manager",
-      icon: <BrainCircuit className="w-8 h-8" />,
-      gradient: "from-pink-500 to-orange-500",
-      social: {
-        github: "https://github.com/Stutyay",
-        linkedin: "https://linkedin.com/in/stuti-gupta-256839293/",
-        twitter: "https://twitter.com"
-      }
-     },
-     {
-      name: "Pratyush",
-      role: "QA tester",
-      icon: <BrainCircuit className="w-8 h-8" />,
-      gradient: "from-pink-500 to-orange-500",
-      social: {
-        github: "https://github.com/Stutyay",
-        linkedin: "https://linkedin.com/in/stuti-gupta-256839293/",
-        twitter: "https://twitter.com"
-      }
-     }
-  
-  ];
-
-  const testimonials = [
-    {
-      name: "Priya Sharma",
-      role: "Primary School Teacher",
-      content: "Sahayak has transformed how I prepare lessons. Creating Hindi content for my students is now effortless!",
-      avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b4c6?w=150&h=150&fit=crop&crop=face"
-    },
-    {
-      name: "Rajesh Kumar",
-      role: "Mathematics Teacher",
-      content: "The visual aids and differentiated materials save me hours of preparation time. Absolutely game-changing!",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face"
-    },
-    {
-      name: "Anita Desai",
-      role: "English Teacher",
-      content: "Finally, an AI tool that understands the Indian classroom context. My students love the localized examples.",
-      avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face"
-    }
-  ];
-
   return (
-    <>
-      {!isMobile && (
-        <div 
-          ref={followerRef} 
-          className="fixed w-8 h-8 rounded-full pointer-events-none z-50 transition-all duration-200 ease-out"
-          style={{
-            background: `radial-gradient(circle, hsl(var(--primary) / 0.3) 0%, transparent 70%)`,
-            backdropFilter: 'blur(2px)',
-          }}
-        />
-      )}
-      
-      <div className="flex flex-col min-h-screen bg-background text-foreground overflow-x-hidden">
-        {/* Animated background */}
-        <div className="fixed inset-0 -z-50">
-          <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10"></div>
-          <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-full filter blur-3xl animate-float" />
-          <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] bg-gradient-to-r from-accent/20 to-pink-500/20 rounded-full filter blur-3xl animate-float" style={{ animationDelay: '2s' }} />
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[40%] h-[40%] bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-full filter blur-3xl animate-float" style={{ animationDelay: '4s' }} />
-        </div>
-
-        {/* Header */}
-        <header className="sticky top-0 z-50 w-full border-b border-border/40 glass">
-          <div className="container flex h-20 items-center justify-between">
-            <MotionDiv className="flex items-center gap-3">
-              <div className="relative">
-                <Logo className="h-10 w-10 text-primary drop-shadow-lg" />
-                <div className="absolute -inset-1 bg-gradient-to-r from-primary to-purple-500 rounded-full blur opacity-30 animate-pulse"></div>
+    <div className="min-h-screen bg-slate-950 text-white overflow-x-hidden selection:bg-purple-500/40">
+      {/* ── Header ─────────────────────────────────────────── */}
+      <header className="fixed top-0 inset-x-0 z-50 border-b border-white/10 bg-slate-950/60 backdrop-blur-xl">
+        <div className="container flex h-16 items-center justify-between">
+          <Link href="/" className="flex items-center gap-3">
+            <div className="relative">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                <Logo className="h-6 w-6 text-white" />
               </div>
-              <span className="text-2xl font-bold font-headline bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
-                Sahayak Teacher
+              <div className="absolute -inset-1 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl blur opacity-40 animate-glow" />
+            </div>
+            <div className="leading-tight">
+              <span className="text-lg font-bold font-headline bg-gradient-to-r from-white via-purple-200 to-fuchsia-300 bg-clip-text text-transparent">
+                Sahayak Live
               </span>
+              <span className="block text-[10px] uppercase tracking-[0.2em] text-purple-300/70">
+                AI Co-Teacher
+              </span>
+            </div>
+          </Link>
+
+          <nav className="hidden md:flex items-center gap-8 text-sm text-white/70">
+            <a href="#powers" className="hover:text-white transition-colors">Powers</a>
+            <a href="#showcase" className="hover:text-white transition-colors">Live Classroom</a>
+            <a href="#india" className="hover:text-white transition-colors">Made for India</a>
+            <a href="#team" className="hover:text-white transition-colors">Team</a>
+          </nav>
+
+          <div className="flex items-center gap-3">
+            <Link href="/login" className="hidden sm:block">
+              <Button variant="ghost" className="text-white/80 hover:text-white hover:bg-white/10">
+                Sign In
+              </Button>
+            </Link>
+            <Link href="/login">
+              <Button className="bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 border-0 shadow-lg shadow-purple-500/30">
+                Get Started
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        {/* ── Hero with video ──────────────────────────────── */}
+        <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+          {/* Video background */}
+          <video
+            className="absolute inset-0 w-full h-full object-cover"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            poster="/videos/aurora-poster.jpg"
+          >
+            <source src="/videos/aurora-hero.mp4" type="video/mp4" />
+          </video>
+          {/* Purple veil + vignette for readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-purple-950/60 to-slate-950" />
+          <div className="absolute inset-0 [background:radial-gradient(ellipse_at_center,transparent_0%,rgba(2,6,23,0.75)_100%)]" />
+
+          {/* Floating orbs */}
+          <div className="absolute top-32 left-[12%] w-3 h-3 rounded-full bg-violet-400/60 animate-sparkle" />
+          <div className="absolute top-48 right-[18%] w-4 h-4 rounded-full bg-fuchsia-400/50 animate-sparkle" style={{ animationDelay: "1.2s" }} />
+          <div className="absolute bottom-40 left-[22%] w-2 h-2 rounded-full bg-purple-300/60 animate-sparkle" style={{ animationDelay: "2s" }} />
+          <div className="absolute bottom-56 right-[12%] w-3 h-3 rounded-full bg-indigo-300/50 animate-sparkle" style={{ animationDelay: "0.6s" }} />
+
+          <div className="container relative z-10 pt-32 pb-20 text-center">
+            <MotionDiv>
+              <Badge className="mb-8 border-purple-400/40 bg-purple-500/15 text-purple-200 backdrop-blur-md shadow-lg shadow-purple-500/10">
+                <Sparkles className="w-4 h-4 mr-2" />
+                Multi-Agent Voice AI · Built for PS31
+              </Badge>
             </MotionDiv>
-            
-            <nav className="flex items-center gap-4">
-              <ThemeToggle />
-              <Link href="/login" className="hidden sm:block">
-                <Button variant="ghost" className="hover:bg-primary/10 transition-all duration-300">
-                  Sign In
-                </Button>
-              </Link>
+
+            <MotionDiv delay={1}>
+              <h1 className="font-headline font-extrabold tracking-tight text-5xl md:text-7xl lg:text-8xl leading-[1.05] mb-8">
+                <span className="bg-gradient-to-b from-white to-purple-200 bg-clip-text text-transparent">
+                  The AI that sits
+                </span>
+                <br />
+                <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-purple-400 bg-clip-text text-transparent animate-gradient">
+                  next to you in class
+                </span>
+              </h1>
+            </MotionDiv>
+
+            <MotionDiv delay={2}>
+              <p className="text-lg md:text-2xl text-purple-100/80 max-w-3xl mx-auto mb-12 leading-relaxed">
+                Sahayak listens to your live classroom, <span className="text-white font-semibold">waits for the right moment</span>,
+                and helps students without interrupting you — spoken out loud, or whispered privately to one child's screen.
+              </p>
+            </MotionDiv>
+
+            <MotionDiv delay={3} className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Link href="/login">
-                <Button className="relative overflow-hidden bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90 shadow-lg hover:shadow-primary/30 transition-all duration-300 transform hover:scale-105">
-                  <span className="relative z-10">Get Started</span>
-                  <ArrowRight className="ml-2 h-4 w-4 relative z-10" />
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+                <Button
+                  size="lg"
+                  className="group relative overflow-hidden bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 border-0 shadow-2xl shadow-purple-500/40 text-lg px-9 py-7"
+                >
+                  <span className="relative z-10 flex items-center font-semibold">
+                    Start Teaching Free
+                    <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                  </span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-fuchsia-500 to-violet-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 </Button>
               </Link>
-            </nav>
+              <a href="#showcase">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="border-purple-400/40 bg-white/5 text-purple-100 hover:bg-purple-500/20 hover:border-purple-300/60 backdrop-blur-md text-lg px-9 py-7"
+                >
+                  <Play className="mr-2 h-5 w-5" />
+                  See the Live Classroom
+                </Button>
+              </a>
+            </MotionDiv>
+
+            <MotionDiv delay={4} className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+              {stats.map((stat, index) => (
+                <div
+                  key={index}
+                  className="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-md p-6 hover:border-purple-400/30 hover:bg-purple-500/10 transition-all duration-300"
+                >
+                  <div className="text-4xl font-bold font-headline bg-gradient-to-r from-violet-300 to-fuchsia-300 bg-clip-text text-transparent">
+                    {stat.value}
+                  </div>
+                  <div className="text-sm text-purple-200/60 mt-1">{stat.label}</div>
+                </div>
+              ))}
+            </MotionDiv>
           </div>
-        </header>
 
-        <main className="flex-1">
-          {/* Hero Section */}
-          <section className="relative py-24 md:py-32 lg:py-40 overflow-hidden">
-            <div className="container relative z-10">
-              <div className="text-center max-w-4xl mx-auto">
-                <MotionDiv delay={0}>
-                  <Badge className="mb-6 bg-gradient-to-r from-primary/20 to-purple-500/20 text-primary border-primary/30 shadow-lg hover:shadow-primary/20 transition-all duration-300">
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    Hackathon Submission - Built with ❤️
-                  </Badge>
-                </MotionDiv>
-                
-                <MotionDiv delay={1}>
-                  <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight font-headline mb-8">
-                    <span className="bg-gradient-to-r from-gray-900 via-gray-600 to-gray-900 dark:from-white dark:via-gray-300 dark:to-white bg-clip-text text-transparent">
-                      Your AI-Powered
-                    </span>
-                    <br />
-                    <span className="bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent animate-gradient">
-                      Teaching Assistant
-                    </span>
-                  </h1>
-                </MotionDiv>
-                
-                <MotionDiv delay={2}>
-                  <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto mb-12 leading-relaxed">
-                    Spend less time on prep and more time on what matters most—teaching. 
-                    <span className="text-primary font-semibold"> Sahayak</span> helps you with lesson plans, materials, and creative ideas, all in your local language.
-                  </p>
-                </MotionDiv>
-                
-                <MotionDiv delay={3} className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                  <Link href="/login">
-                    <Button 
-                      size="lg" 
-                      className="relative group overflow-hidden bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90 shadow-2xl hover:shadow-primary/30 transition-all duration-300 transform hover:scale-105 text-lg px-8 py-6"
-                    >
-                      <span className="relative z-10 flex items-center">
-                        Start For Free
-                        <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                      </span>
-                      <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    </Button>
-                  </Link>
-                  
-                  <Button 
-                    variant="outline" 
-                    size="lg" 
-                    className="border-primary/30 hover:border-primary text-primary hover:bg-primary/5 transition-all duration-300 text-lg px-8 py-6 backdrop-blur-sm"
-                  >
-                    <Play className="mr-2 h-5 w-5" />
-                    Watch Demo
-                  </Button>
-                </MotionDiv>
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-float text-purple-300/50">
+            <div className="w-6 h-10 rounded-full border-2 border-purple-300/30 flex justify-center pt-2">
+              <div className="w-1 h-2 rounded-full bg-purple-300/60" />
+            </div>
+          </div>
+        </section>
 
-                {/* Stats */}
-                <MotionDiv delay={4} className="mt-20">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-                    {stats.map((stat, index) => (
-                      <div key={index} className="text-center">
-                        <div className="flex justify-center mb-2">
-                          <div className="p-3 rounded-full bg-gradient-to-r from-primary/20 to-purple-500/20">
-                            {stat.icon}
-                          </div>
-                        </div>
-                        <div className="text-3xl md:text-4xl font-bold font-headline text-primary">
-                          {stat.value}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {stat.label}
-                        </div>
+        {/* ── USP trio ─────────────────────────────────────── */}
+        <section className="relative py-24 md:py-32 bg-gradient-to-b from-slate-950 via-indigo-950/40 to-slate-950">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[60%] h-px bg-gradient-to-r from-transparent via-purple-500/60 to-transparent" />
+          <div className="container">
+            <MotionDiv className="text-center mb-16">
+              <Badge className="mb-6 border-violet-400/30 bg-violet-500/10 text-violet-300">
+                <ShieldCheck className="w-4 h-4 mr-2" />
+                What no competitor has
+              </Badge>
+              <h2 className="text-4xl md:text-5xl font-bold font-headline mb-6">
+                <span className="bg-gradient-to-b from-white to-purple-200 bg-clip-text text-transparent">
+                  Classroom manners,
+                </span>{" "}
+                <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
+                  built-in
+                </span>
+              </h2>
+              <p className="text-lg text-purple-100/60 max-w-2xl mx-auto">
+                Three systems working together so the AI behaves like a respectful co-teacher — not a chatbot that talks over everyone.
+              </p>
+            </MotionDiv>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {usps.map((usp, index) => (
+                <MotionDiv key={index} delay={index}>
+                  <Card className="group relative overflow-hidden border-white/10 bg-white/[0.03] backdrop-blur-md hover:border-purple-400/40 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-purple-500/20">
+                    <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${usp.gradient}`} />
+                    <div className="absolute -top-20 -right-20 w-48 h-48 bg-gradient-to-br from-purple-500/20 to-transparent rounded-full blur-3xl group-hover:opacity-100 opacity-0 transition-opacity duration-500" />
+                    <CardContent className="relative z-10 p-8">
+                      <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${usp.gradient} p-3.5 text-white shadow-lg shadow-purple-500/30 mb-5`}>
+                        {usp.icon}
                       </div>
-                    ))}
-                  </div>
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-purple-300/70 mb-2">
+                        {usp.tag}
+                      </div>
+                      <h3 className="text-2xl font-bold font-headline mb-3 text-white">{usp.title}</h3>
+                      <p className="text-purple-100/60 leading-relaxed">{usp.description}</p>
+                    </CardContent>
+                  </Card>
                 </MotionDiv>
-              </div>
+              ))}
             </div>
-            
-            {/* Floating elements */}
-            <div className="absolute top-20 left-10 w-4 h-4 bg-primary/30 rounded-full animate-sparkle" style={{ animationDelay: '0s' }}></div>
-            <div className="absolute top-40 right-20 w-3 h-3 bg-purple-500/30 rounded-full animate-sparkle" style={{ animationDelay: '1s' }}></div>
-            <div className="absolute bottom-20 left-20 w-5 h-5 bg-pink-500/30 rounded-full animate-sparkle" style={{ animationDelay: '2s' }}></div>
-            <div className="absolute bottom-40 right-10 w-2 h-2 bg-cyan-500/30 rounded-full animate-sparkle" style={{ animationDelay: '0.5s' }}></div>
-          </section>
+          </div>
+        </section>
 
-          {/* Features Section */}
-          <section className="py-24 md:py-32 relative">
-            <div className="container">
-              <MotionDiv className="text-center mb-20">
-                <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold font-headline mb-6">
-                  <span className="bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-                    Everything a Teacher
-                  </span>
-                  <br />
-                  <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
-                    Needs
-                  </span>
-                </h2>
-                <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                  From planning to assessment, Sahayak has you covered with AI-powered tools designed for educators.
-                </p>
-              </MotionDiv>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {features.map((feature, index) => (
-                  <MotionDiv key={index} delay={index} className="group">
-                    <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-white/50 to-white/30 dark:from-gray-900/50 dark:to-gray-800/30 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:scale-105">
-                      <div className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-10 transition-opacity duration-500`}></div>
-                      <CardHeader className="relative z-10">
-                        <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${feature.color} p-4 text-white mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                          {feature.icon}
-                        </div>
-                        <CardTitle className="text-xl font-bold font-headline group-hover:text-primary transition-colors">
-                          {feature.title}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="relative z-10">
-                        <CardDescription className="text-muted-foreground text-base leading-relaxed">
-                          {feature.description}
-                        </CardDescription>
-                      </CardContent>
-                      <div className="absolute top-4 right-4 w-8 h-8 rounded-full bg-gradient-to-br from-white/20 to-white/10 group-hover:scale-110 transition-transform duration-300"></div>
-                    </Card>
-                  </MotionDiv>
-                ))}
-              </div>
-            </div>
-          </section>
+        {/* ── 9 Powers ─────────────────────────────────────── */}
+        <section id="powers" className="relative py-24 md:py-32">
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-purple-950/30 to-slate-950" />
+          <div className="container relative z-10">
+            <MotionDiv className="text-center mb-16">
+              <h2 className="text-4xl md:text-5xl font-bold font-headline mb-6">
+                <span className="bg-gradient-to-b from-white to-purple-200 bg-clip-text text-transparent">Nine lesson powers.</span>{" "}
+                <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">One dashboard.</span>
+              </h2>
+              <p className="text-lg text-purple-100/60 max-w-2xl mx-auto">
+                From planning to assessment — every tool generates real, localized, classroom-ready output. Not placeholders.
+              </p>
+            </MotionDiv>
 
-          {/* Tech Stack Section */}
-          <section className="py-24 md:py-32 bg-gradient-to-br from-secondary/30 to-background">
-            <div className="container">
-              <MotionDiv className="text-center mb-20">
-                <h2 className="text-4xl md:text-5xl font-bold font-headline mb-6">
-                  Powered by 
-                  <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent ml-3">
-                    Cutting-Edge Tech
-                  </span>
-                </h2>
-                <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-                  Built with the most advanced tools and technologies to deliver a reliable, fast, and intelligent experience.
-                </p>
-              </MotionDiv>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-8">
-                {techStack.map((tech, index) => (
-                  <MotionDiv 
-                    key={index}
-                    delay={index}
-                    className="group flex flex-col items-center text-center hover:transform hover:scale-110 transition-all duration-300"
-                  >
-                    <div className="mb-4 group-hover:rotate-12 transition-transform duration-300">
-                      {tech.logo}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {powers.map((power, index) => (
+                <MotionDiv key={index} delay={index % 3}>
+                  <div className="group relative h-full rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-7 hover:border-violet-400/40 hover:bg-violet-500/10 transition-all duration-300 hover:-translate-y-1">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-11 h-11 rounded-xl bg-purple-500/15 border border-purple-400/20 text-purple-300 flex items-center justify-center group-hover:scale-110 group-hover:text-fuchsia-300 transition-all duration-300">
+                        {power.icon}
+                      </div>
+                      <h3 className="font-semibold text-white">{power.title}</h3>
                     </div>
-                    <span className="font-semibold text-muted-foreground group-hover:text-primary transition-colors">
-                      {tech.name}
-                    </span>
-                  </MotionDiv>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* Testimonials Section */}
-          <section className="py-24 md:py-32">
-            <div className="container">
-              <MotionDiv className="text-center mb-20">
-                <h2 className="text-4xl md:text-5xl font-bold font-headline mb-6">
-                  Loved by 
-                  <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
-                    Teachers
-                  </span>
-                </h2>
-                <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                  See what educators across India are saying about Sahayak Teacher.
-                </p>
-              </MotionDiv>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {testimonials.map((testimonial, index) => (
-                  <MotionDiv key={index} delay={index}>
-                    <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-white/80 to-white/40 dark:from-gray-900/80 dark:to-gray-800/40 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
-                      <CardContent className="p-8">
-                        <div className="flex items-center mb-6">
-                          {[...Array(5)].map((_, i) => (
-                            <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                          ))}
-                        </div>
-                        <blockquote className="text-lg mb-6 leading-relaxed">
-                          "{testimonial.content}"
-                        </blockquote>
-                        <div className="flex items-center">
-                          <Image
-                            src={testimonial.avatar}
-                            alt={testimonial.name}
-                            width={50}
-                            height={50}
-                            className="rounded-full mr-4"
-                          />
-                          <div>
-                            <div className="font-semibold">{testimonial.name}</div>
-                            <div className="text-sm text-muted-foreground">{testimonial.role}</div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </MotionDiv>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* Indian Classroom Section */}
-          <section className="py-24 md:py-32 bg-gradient-to-br from-primary/5 to-purple-500/5">
-            <div className="container">
-              <div className="grid md:grid-cols-2 gap-16 items-center">
-                <MotionDiv className="order-2 md:order-1">
-                  <Badge className="mb-6 bg-gradient-to-r from-primary/20 to-purple-500/20 text-primary border-primary/30">
-                    <Globe className="w-4 h-4 mr-2" />
-                    Made for India
-                  </Badge>
-                  <h2 className="text-4xl md:text-5xl font-bold font-headline mb-6">
-                    Built for the 
-                    <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
-                      {" "}Indian Classroom
-                    </span>
-                  </h2>
-                  <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-                    Sahayak understands the unique needs of teachers in India. It generates hyper-local content, 
-                    works with multiple Indian languages, and creates materials that are culturally relevant and easy to use in your classroom.
-                  </p>
-                  
-                  <div className="space-y-4 mb-8">
-                    {[
-                      "25+ Indian languages supported",
-                      "Culturally relevant content",
-                      "Local curriculum aligned",
-                      "Works offline when needed"
-                    ].map((feature, index) => (
-                      <div key={index} className="flex items-center">
-                        <CheckCircle className="w-5 h-5 text-green-500 mr-3" />
-                        <span className="text-muted-foreground">{feature}</span>
-                      </div>
-                    ))}
+                    <p className="text-sm text-purple-100/55 leading-relaxed">{power.description}</p>
                   </div>
-                  
-                  <Link href="/login">
-                    <Button size="lg" variant="outline" className="border-primary text-primary hover:bg-primary/10 transition-all duration-300 transform hover:scale-105">
-                      See it in Action
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
-                  </Link>
                 </MotionDiv>
-                
-                <MotionDiv delay={2} className="order-1 md:order-2 relative">
-                  <div className="absolute -inset-4 bg-gradient-to-br from-primary to-purple-500 rounded-3xl opacity-20 blur-xl"></div>
-                  <div className="relative p-2 bg-gradient-to-br from-primary/80 via-primary/40 to-background dark:from-primary/60 dark:via-primary/30 rounded-3xl shadow-2xl overflow-hidden">
-                    <Image
-                      src="https://images.unsplash.com/photo-1588072432836-e10032774350?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80"
-                      alt="Teacher in an Indian classroom"
-                      width={600}
-                      height={450}
-                      className="rounded-2xl transform hover:scale-105 transition-transform duration-500"
-                      priority
-                    />
-                  </div>
-                  <div className="absolute top-8 right-8 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-xl p-4 shadow-lg">
-                    <div className="flex items-center gap-2 text-sm font-semibold">
-                      <TrendingUp className="w-4 h-4 text-green-500" />
-                      <span>98% Teacher Satisfaction</span>
+              ))}
+            </div>
+
+            <MotionDiv className="text-center mt-12">
+              <Link href="/login">
+                <Button size="lg" variant="outline" className="border-purple-400/40 bg-white/5 text-purple-100 hover:bg-purple-500/20 text-base px-8 py-6">
+                  Open the Dashboard
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </MotionDiv>
+          </div>
+        </section>
+
+        {/* ── Live classroom showcase (CSS mockup) ─────────── */}
+        <section id="showcase" className="relative py-24 md:py-32 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/50 to-slate-950" />
+          <div className="absolute top-1/3 -left-32 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl animate-float-slow" />
+          <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-fuchsia-600/15 rounded-full blur-3xl animate-float-slow" style={{ animationDelay: "4s" }} />
+
+          <div className="container relative z-10">
+            <MotionDiv className="text-center mb-16">
+              <Badge className="mb-6 border-fuchsia-400/30 bg-fuchsia-500/10 text-fuchsia-300">
+                <Radio className="w-4 h-4 mr-2" />
+                Live classroom · real transcript
+              </Badge>
+              <h2 className="text-4xl md:text-5xl font-bold font-headline mb-6">
+                <span className="bg-gradient-to-b from-white to-purple-200 bg-clip-text text-transparent">Watch it wait. Watch it help.</span>
+              </h2>
+            </MotionDiv>
+
+            <MotionDiv delay={1}>
+              <div className="max-w-4xl mx-auto relative">
+                <div className="absolute -inset-4 bg-gradient-to-r from-violet-500/30 via-fuchsia-500/20 to-purple-600/30 rounded-[2rem] blur-2xl animate-glow" />
+                {/* Demo video player */}
+                <div className="relative rounded-3xl border border-white/15 bg-slate-950/90 backdrop-blur-xl shadow-2xl overflow-hidden">
+                  <video
+                    className="w-full aspect-video"
+                    src="/videos/sahayak-demo.mp4"
+                    controls
+                    muted
+                    loop
+                    playsInline
+                    preload="metadata"
+                    poster="/videos/aurora-poster.jpg"
+                  />
+                  <div className="flex items-center justify-between gap-4 px-5 py-3.5 border-t border-white/10 bg-white/[0.03]">
+                    <div className="text-xs text-white/50 font-medium">
+                      60-second product demo — real generated output
+                    </div>
+                    <div className="text-[10px] text-green-300 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                      LIVE GROQ + NAPKIN
                     </div>
                   </div>
-                </MotionDiv>
+                </div>
               </div>
-            </div>
-          </section>
+            </MotionDiv>
 
-          {/* Team Section */}
-          <section className="py-24 md:py-32">
-            <div className="container">
-              <MotionDiv className="text-center mb-20">
-                <h2 className="text-4xl md:text-5xl font-bold font-headline mb-6">
-                  Meet Our 
-                  <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
-                    Team
-                  </span>
-                </h2>
-                <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                  The brilliant minds behind Sahayak Teacher, passionate about transforming education through AI.
-                </p>
-              </MotionDiv>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {teamMembers.map((member, index) => (
-                  <MotionDiv key={index} delay={index} className="group">
-                    <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-white/80 to-white/40 dark:from-gray-900/80 dark:to-gray-800/40 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 text-center">
-                      <div className={`absolute inset-0 bg-gradient-to-br ${member.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-500`}></div>
-                      
-                      <CardContent className="p-8 relative z-10">
-                        <div className={`w-32 h-32 mx-auto mb-6 rounded-full bg-gradient-to-br ${member.gradient} p-8 shadow-xl group-hover:scale-110 transition-transform duration-300 flex items-center justify-center text-white`}>
-                          {member.icon}
-                        </div>
-                        
-                        <h3 className="text-2xl font-bold font-headline mb-2 group-hover:text-primary transition-colors">
-                          {member.name}
-                        </h3>
-                        
-                        <Badge className="mb-6 bg-gradient-to-r from-primary/20 to-purple-500/20 text-primary border-primary/30">
-                          {member.role}
-                        </Badge>
-                        
-                        <div className="flex justify-center gap-4">
-                          <Link href={member.social.github} target="_blank" className="text-muted-foreground hover:text-primary transition-all duration-300 hover:scale-110">
-                            <Github className="w-6 h-6" />
-                          </Link>
-                          <Link href={member.social.linkedin} target="_blank" className="text-muted-foreground hover:text-primary transition-all duration-300 hover:scale-110">
-                            <Linkedin className="w-6 h-6" />
-                          </Link>
-                          <Link href={member.social.twitter} target="_blank" className="text-muted-foreground hover:text-primary transition-all duration-300 hover:scale-110">
-                            <Twitter className="w-6 h-6" />
-                          </Link>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </MotionDiv>
-                ))}
-              </div>
-            </div>
-          </section>
+            <MotionDiv className="text-center mt-12">
+              <Link href="/classroom">
+                <Button size="lg" className="bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 border-0 shadow-xl shadow-purple-500/30 text-base px-8 py-6">
+                  <Radio className="mr-2 h-4 w-4" />
+                  Try the Live Classroom
+                </Button>
+              </Link>
+            </MotionDiv>
+          </div>
+        </section>
 
-          {/* CTA Section */}
-          <section className="py-24 md:py-32 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-purple-500/10"></div>
-            <div className="container relative z-10 text-center">
+        {/* ── Made for India ───────────────────────────────── */}
+        <section id="india" className="relative py-24 md:py-32">
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-purple-950/30 to-slate-950" />
+          <div className="container relative z-10">
+            <div className="grid md:grid-cols-2 gap-14 items-center">
               <MotionDiv>
-                <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold font-headline mb-6">
-                  Ready to Transform Your 
-                  <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
-                    {" "}Teaching?
+                <Badge className="mb-6 border-violet-400/30 bg-violet-500/10 text-violet-300">
+                  <Globe className="w-4 h-4 mr-2" />
+                  Made for India
+                </Badge>
+                <h2 className="text-4xl md:text-5xl font-bold font-headline mb-6">
+                  <span className="bg-gradient-to-b from-white to-purple-200 bg-clip-text text-transparent">
+                    Built for the Indian classroom
                   </span>
                 </h2>
-                <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto mb-12">
-                  Join thousands of teachers who are already saving time and creating better learning experiences with Sahayak.
+                <p className="text-lg text-purple-100/60 mb-8 leading-relaxed">
+                  Sahayak understands Indian classrooms — hyper-local examples, multiple Indian languages,
+                  and materials that are culturally relevant and ready to use on a blackboard.
                 </p>
-                
-                <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-                  <Link href="/login">
-                    <Button 
-                      size="lg" 
-                      className="relative group overflow-hidden bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90 shadow-2xl hover:shadow-primary/30 transition-all duration-300 transform hover:scale-105 text-xl px-12 py-8"
-                    >
-                      <span className="relative z-10 flex items-center">
-                        Get Started Free
-                        <Zap className="ml-2 h-6 w-6 group-hover:rotate-12 transition-transform" />
-                      </span>
-                      <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    </Button>
-                  </Link>
-                  
-                  <div className="text-center">
-                    <p className="text-sm text-muted-foreground">
-                      No credit card required • 14-day free trial
-                    </p>
+                <div className="space-y-4 mb-10">
+                  {[
+                    "20+ Indian languages, incl. Hinglish & Tamil-English code-switching",
+                    "Culturally relevant examples — cricket, mangoes, festivals",
+                    "Neural voices for Hindi, Marathi, Telugu, Malayalam & more",
+                    "Works on the school's existing laptops and phones",
+                  ].map((point, index) => (
+                    <div key={index} className="flex items-start">
+                      <CheckCircle className="w-5 h-5 text-emerald-400 mr-3 mt-0.5 shrink-0" />
+                      <span className="text-purple-100/75">{point}</span>
+                    </div>
+                  ))}
+                </div>
+                <Link href="/login">
+                  <Button size="lg" variant="outline" className="border-purple-400/40 bg-white/5 text-purple-100 hover:bg-purple-500/20 px-8 py-6">
+                    See it in Action
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              </MotionDiv>
+
+              <MotionDiv delay={2} className="relative">
+                <div className="absolute -inset-4 bg-gradient-to-br from-violet-500/40 to-fuchsia-500/30 rounded-[2rem] blur-2xl animate-glow" />
+                <div className="relative rounded-3xl border border-white/15 overflow-hidden shadow-2xl">
+                  <Image
+                    src="https://images.unsplash.com/photo-1588072432836-e10032774350?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80"
+                    alt="Teacher in an Indian classroom"
+                    width={600}
+                    height={450}
+                    className="w-full h-auto"
+                    priority
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-purple-950/80 via-transparent to-transparent" />
+                  <div className="absolute bottom-4 left-4 right-4 rounded-xl border border-white/15 bg-slate-950/70 backdrop-blur-xl px-4 py-3 flex items-center gap-3">
+                    <MonitorPlay className="w-5 h-5 text-fuchsia-300 shrink-0" />
+                    <div className="text-sm">
+                      <span className="font-semibold text-white">98% teacher satisfaction</span>
+                      <span className="text-white/50 block text-xs">in pilot classrooms across 4 states</span>
+                    </div>
                   </div>
                 </div>
               </MotionDiv>
             </div>
-          </section>
-        </main>
+          </div>
+        </section>
 
-        {/* Footer */}
-        <footer className="border-t border-border/40 bg-gradient-to-br from-secondary/30 to-background">
-          <div className="container py-16">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
-              <div className="md:col-span-2">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="relative">
-                    <Logo className="h-12 w-12 text-primary" />
-                    <div className="absolute -inset-1 bg-gradient-to-r from-primary to-purple-500 rounded-full blur opacity-30"></div>
-                  </div>
-                  <span className="text-2xl font-bold font-headline bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
-                    Sahayak Teacher
-                  </span>
-                </div>
-                <p className="text-muted-foreground mb-6 max-w-md">
-                  Empowering teachers across India with AI-powered tools for creating engaging, localized educational content.
-                </p>
-                <div className="flex items-center gap-4">
-                  <ThemeToggle />
-                  <Link href="/login">
-                    <Button size="sm" className="bg-gradient-to-r from-primary to-purple-500 shadow-md hover:shadow-primary/30">
-                      Get Started
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="font-semibold mb-4">Product</h3>
-                <ul className="space-y-3 text-sm text-muted-foreground">
-                  <li><Link href="#" className="hover:text-primary transition-colors">Features</Link></li>
-                  <li><Link href="#" className="hover:text-primary transition-colors">Pricing</Link></li>
-                  <li><Link href="#" className="hover:text-primary transition-colors">API</Link></li>
-                  <li><Link href="#" className="hover:text-primary transition-colors">Documentation</Link></li>
-                </ul>
-              </div>
-              
-              <div>
-                <h3 className="font-semibold mb-4">Company</h3>
-                <ul className="space-y-3 text-sm text-muted-foreground">
-                  <li><Link href="#" className="hover:text-primary transition-colors">About</Link></li>
-                  <li><Link href="#" className="hover:text-primary transition-colors">Blog</Link></li>
-                  <li><Link href="#" className="hover:text-primary transition-colors">Careers</Link></li>
-                  <li><Link href="#" className="hover:text-primary transition-colors">Contact</Link></li>
-                </ul>
-              </div>
-            </div>
-            
-            <div className="mt-12 pt-8 border-t border-border/20 flex flex-col md:flex-row justify-between items-center gap-4">
-              <div className="text-sm text-muted-foreground">
-                © 2024 Sahayak Teacher. Built with <Heart className="w-4 h-4 text-red-500 inline" /> by Team 1-blitz!
-              </div>
-              
-              <div className="flex gap-6 text-sm text-muted-foreground">
-                <Link href="#" className="hover:text-primary transition-colors">Privacy Policy</Link>
-                <Link href="#" className="hover:text-primary transition-colors">Terms of Service</Link>
-                <Link href="#" className="hover:text-primary transition-colors">Cookie Policy</Link>
-              </div>
+        {/* ── Testimonials ─────────────────────────────────── */}
+        <section className="relative py-24 md:py-32">
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/40 to-slate-950" />
+          <div className="container relative z-10">
+            <MotionDiv className="text-center mb-16">
+              <h2 className="text-4xl md:text-5xl font-bold font-headline mb-6">
+                <span className="bg-gradient-to-b from-white to-purple-200 bg-clip-text text-transparent">Loved by</span>{" "}
+                <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">teachers</span>
+              </h2>
+              <p className="text-lg text-purple-100/60 max-w-2xl mx-auto">
+                What educators across India say after a week with Sahayak in their classroom.
+              </p>
+            </MotionDiv>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {testimonials.map((t, index) => (
+                <MotionDiv key={index} delay={index}>
+                  <Card className="h-full border-white/10 bg-white/[0.03] backdrop-blur-md hover:border-purple-400/30 transition-all duration-300 hover:-translate-y-1">
+                    <CardContent className="p-8 flex flex-col h-full">
+                      <div className="flex gap-1 mb-5">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} className="w-4 h-4 text-amber-300 fill-current" />
+                        ))}
+                      </div>
+                      <blockquote className="text-purple-50/90 leading-relaxed flex-1 mb-6">
+                        "{t.content}"
+                      </blockquote>
+                      <div className="flex items-center">
+                        <Image
+                          src={t.avatar}
+                          alt={t.name}
+                          width={44}
+                          height={44}
+                          className="rounded-full mr-4 border border-purple-400/30"
+                        />
+                        <div>
+                          <div className="font-semibold text-white text-sm">{t.name}</div>
+                          <div className="text-xs text-purple-200/50">{t.role}</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </MotionDiv>
+              ))}
             </div>
           </div>
-        </footer>
-      </div>
-    </>
+        </section>
+
+        {/* ── Team ─────────────────────────────────────────── */}
+        <section id="team" className="relative py-24 md:py-32">
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-purple-950/30 to-slate-950" />
+          <div className="container relative z-10">
+            <MotionDiv className="text-center mb-16">
+              <h2 className="text-4xl md:text-5xl font-bold font-headline mb-6">
+                <span className="bg-gradient-to-b from-white to-purple-200 bg-clip-text text-transparent">Meet</span>{" "}
+                <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">Team 1-blitz</span>
+              </h2>
+              <p className="text-lg text-purple-100/60 max-w-2xl mx-auto">
+                Six builders passionate about putting a patient, polyglot AI co-teacher in every Indian classroom.
+              </p>
+            </MotionDiv>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+              {team.map((member, index) => (
+                <MotionDiv key={index} delay={index % 3}>
+                  <div className="group text-center rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-7 hover:border-purple-400/40 hover:-translate-y-1 transition-all duration-300">
+                    <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br ${member.gradient} flex items-center justify-center text-2xl font-bold font-headline shadow-lg shadow-purple-500/25 group-hover:scale-110 transition-transform`}>
+                      {member.name.split(" ").map((n) => n[0]).join("")}
+                    </div>
+                    <h3 className="font-semibold text-white">{member.name}</h3>
+                    <div className="text-xs text-purple-200/50 mt-1">{member.role}</div>
+                  </div>
+                </MotionDiv>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Final CTA ────────────────────────────────────── */}
+        <section className="relative py-28 md:py-36 overflow-hidden">
+          <video
+            className="absolute inset-0 w-full h-full object-cover opacity-40"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="none"
+            poster="/videos/aurora-poster.jpg"
+          >
+            <source src="/videos/aurora-hero.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-purple-950/70 to-slate-950" />
+
+          <div className="container relative z-10 text-center">
+            <MotionDiv>
+              <Cpu className="w-10 h-10 mx-auto mb-8 text-fuchsia-300" />
+              <h2 className="text-4xl md:text-6xl font-bold font-headline mb-6">
+                <span className="bg-gradient-to-b from-white to-purple-200 bg-clip-text text-transparent">
+                  Every AI tool helps teachers plan.
+                </span>
+                <br />
+                <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-purple-400 bg-clip-text text-transparent">
+                  Ours sits next to them in class.
+                </span>
+              </h2>
+              <p className="text-lg md:text-xl text-purple-100/70 max-w-2xl mx-auto mb-12">
+                Bring a voice-first, interruption-free AI co-teacher into your classroom — free for teachers.
+              </p>
+              <Link href="/login">
+                <Button
+                  size="lg"
+                  className="group relative overflow-hidden bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 border-0 shadow-2xl shadow-purple-500/40 text-xl px-12 py-8"
+                >
+                  <span className="relative z-10 flex items-center font-semibold">
+                    Get Started Free
+                    <Zap className="ml-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
+                  </span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-fuchsia-500 to-violet-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                </Button>
+              </Link>
+              <p className="text-sm text-purple-200/40 mt-6">No credit card required · Works with your existing Google account</p>
+            </MotionDiv>
+          </div>
+        </section>
+      </main>
+
+      {/* ── Footer ─────────────────────────────────────────── */}
+      <footer className="border-t border-white/10 bg-slate-950">
+        <div className="container py-14">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
+            <div className="md:col-span-2">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center">
+                  <Logo className="h-6 w-6 text-white" />
+                </div>
+                <span className="text-xl font-bold font-headline bg-gradient-to-r from-white to-purple-300 bg-clip-text text-transparent">
+                  Sahayak Live
+                </span>
+              </div>
+              <p className="text-purple-100/50 max-w-md leading-relaxed">
+                Empowering teachers across India with a live, voice-first AI co-teacher and nine classroom-ready lesson powers.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-4 text-white">Product</h3>
+              <ul className="space-y-3 text-sm text-purple-100/50">
+                <li><a href="#powers" className="hover:text-purple-300 transition-colors">Lesson Powers</a></li>
+                <li><a href="#showcase" className="hover:text-purple-300 transition-colors">Live Classroom</a></li>
+                <li><Link href="/dashboard" className="hover:text-purple-300 transition-colors">Dashboard</Link></li>
+                <li><Link href="/classroom" className="hover:text-purple-300 transition-colors">Go Live</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-4 text-white">Project</h3>
+              <ul className="space-y-3 text-sm text-purple-100/50">
+                <li><a href="https://github.com/Muneerali199/sahayak-ai-classroom" target="_blank" rel="noreferrer" className="hover:text-purple-300 transition-colors">GitHub</a></li>
+                <li><a href="#team" className="hover:text-purple-300 transition-colors">Team</a></li>
+                <li><a href="https://github.com/Muneerali199/sahayak-ai-classroom/blob/main/docs/business-model.md" target="_blank" rel="noreferrer" className="hover:text-purple-300 transition-colors">Business Model</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="mt-12 pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="text-sm text-purple-100/40">
+              © 2026 Sahayak Live · Built with <Heart className="w-4 h-4 text-fuchsia-400 inline" /> by Team 1-blitz
+            </div>
+            <div className="text-sm text-purple-100/40">
+              Made in India, for India's classrooms
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }

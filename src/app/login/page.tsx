@@ -70,8 +70,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
-      <Card className="w-full max-w-sm">
+    <div className="dark flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 p-4 relative overflow-hidden">
+      {/* Ambient purple glow */}
+      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-purple-600/20 rounded-full blur-3xl animate-float" />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-fuchsia-600/15 rounded-full blur-3xl animate-float" style={{ animationDelay: "2s" }} />
+      <Card className="w-full max-w-sm border-purple-400/20 !bg-white/[0.04] backdrop-blur-xl shadow-2xl shadow-purple-500/20 relative z-10">
         <CardHeader className="text-center">
           <div className="mx-auto flex items-center justify-center gap-2 mb-4">
             <Logo className="h-10 w-10 text-primary" />

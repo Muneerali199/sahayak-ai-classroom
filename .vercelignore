@@ -1,0 +1,21 @@
+# Python neural-TTS venv (740MB, backend-only)
+piper-venv
+
+# Local build artifacts & caches
+.next
+node_modules
+tsconfig.tsbuildinfo
+
+# Python multi-agent backend (not part of the Next.js deploy)
+backend
+
+# Local tooling / docs / test harnesses
+scripts
+docs
+extension
+.pirq
+.playwright-mcp
+*.log
+
+# Vendored SDK bundle (classroom loads Agora from npm instead)
+public/AgoraRTC.js

@@ -141,8 +141,10 @@ function Dashboard() {
   return (
     <>
       {!isMobile && <div ref={followerRef} className="cursor-follower-element" />}
+      {/* "dark" wrapper → deep purple palette (matches the live classroom) */}
+      <div className="dark">
       <SidebarProvider>
-        <div className="flex min-h-screen bg-secondary/40">
+        <div className="flex min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950">
           <Sidebar>
             <SidebarHeader>
               <div className="flex items-center gap-2">
@@ -224,6 +226,7 @@ function Dashboard() {
           </SidebarInset>
         </div>
       </SidebarProvider>
+      </div>
     </>
   );
 }

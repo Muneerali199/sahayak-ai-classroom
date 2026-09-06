@@ -161,13 +161,23 @@ const StoryPlayer = ({
       </Card>
       
       <div className="flex items-center gap-4">
-        <Button onClick={togglePlay} size="icon" className="rounded-full">
-          {isPlaying ? <Pause /> : <Play className="ml-0.5" />}
-        </Button>
-        <Progress value={progress} className="h-2" />
+        {story.audioDataUri ? (
+          <>
+            <Button onClick={togglePlay} size="icon" className="rounded-full">
+              {isPlaying ? <Pause /> : <Play className="ml-0.5" />}
+            </Button>
+            <Progress value={progress} className="h-2" />
+          </>
+        ) : (
+          <p className="text-xs text-muted-foreground text-center w-full border border-dashed border-border p-2.5 rounded-md">
+            Narration audio requires the local Sahayak backend — read the scenes below with your class.
+          </p>
+        )}
       </div>
-      
-      <audio ref={audioRef} src={story.audioDataUri} className="hidden" />
+
+      {story.audioDataUri && (
+        <audio ref={audioRef} src={story.audioDataUri} className="hidden" />
+      )}
     </div>
   );
 };

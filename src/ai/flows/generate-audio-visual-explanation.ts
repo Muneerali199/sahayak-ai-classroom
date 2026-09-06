@@ -52,12 +52,20 @@ export async function generateAudioVisualExplanation(
 
   const [audioDataUri, visualAidDataUri] = await Promise.all([
     (async () => {
-      const res = await fetch(
-        `${BACKEND}/api/tts?text=${encodeURIComponent(explanation)}&lang=${encodeURIComponent(lang)}`
-      );
-      if (!res.ok) throw new Error(`TTS failed: ${res.status}`);
-      const buf = Buffer.from(await res.arrayBuffer());
-      return `data:audio/wav;base64,${buf.toString('base64')}`;
+      // Best-effort: when the local Sahayak backend isn't running (e.g. the
+      // deployed demo), return no audio instead of failing the whole flow —
+      // the text + visual still render and the UI hides the player.
+      try {
+        const res = await fetch(
+          `${BACKEND}/api/tts?text=${encodeURIComponent(explanation)}&lang=${encodeURIComponent(lang)}`,
+          {signal: AbortSignal.timeout(20000)}
+        );
+        if (!res.ok) return '';
+        const buf = Buffer.from(await res.arrayBuffer());
+        return `data:audio/wav;base64,${buf.toString('base64')}`;
+      } catch {
+        return '';
+      }
     })(),
     generateNapkinVisual({
       content: imagePrompt,

@@ -74,12 +74,19 @@ export async function generateInteractiveStory(
 
   const [audioDataUri, illustrationResults] = await Promise.all([
     (async () => {
-      const res = await fetch(
-        `${BACKEND}/api/tts?text=${encodeURIComponent(fullStoryText.slice(0, 2500))}&lang=${encodeURIComponent(lang)}`
-      );
-      if (!res.ok) throw new Error(`TTS failed: ${res.status}`);
-      const buf = Buffer.from(await res.arrayBuffer());
-      return `data:audio/wav;base64,${buf.toString('base64')}`;
+      // Best-effort: no local backend (deployed demo) → no audio, story still
+      // renders; the UI hides narration controls when audioDataUri is empty.
+      try {
+        const res = await fetch(
+          `${BACKEND}/api/tts?text=${encodeURIComponent(fullStoryText.slice(0, 2500))}&lang=${encodeURIComponent(lang)}`,
+          {signal: AbortSignal.timeout(20000)}
+        );
+        if (!res.ok) return '';
+        const buf = Buffer.from(await res.arrayBuffer());
+        return `data:audio/wav;base64,${buf.toString('base64')}`;
+      } catch {
+        return '';
+      }
     })(),
     Promise.all(
       scenes

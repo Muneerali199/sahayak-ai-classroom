@@ -363,6 +363,24 @@ Full research + pricing + go-to-market: **[docs/business-model.md](docs/business
 
 ---
 
+## 🚀 Live Deployment
+
+The site is deployed on Vercel: **https://sahayak-live-virid.vercel.app**
+
+- Landing page (purple theme + aurora video hero) at `/`
+- Full product demo video at `/demo` — a 60-second walkthrough with real generated output
+- Dashboard (Groq + Napkin keys configured as Vercel env vars) at `/dashboard`
+
+**Embed the demo video anywhere** (e.g. Commudle submission):
+
+```html
+<iframe src="https://sahayak-live-virid.vercel.app/demo" width="600" height="400" allow="autoplay; fullscreen" allowfullscreen></iframe>
+```
+
+Security: strict CSP + `X-Frame-Options`/`frame-ancestors` deny framing on all routes except `/demo` (which allows embeds), HSTS, nosniff, referrer-policy, and a locked-down permissions policy (mic only). Secrets stay server-side in Vercel env vars — nothing is committed.
+
+---
+
 ## 📄 License
 
 MIT. Built on [Sahayak-Teacher](https://github.com/Muneerali199/sahayak-teacher) by Muneer Ali.

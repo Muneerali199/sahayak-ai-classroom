@@ -6,8 +6,9 @@ import { AuthProvider } from "@/context/auth-context";
 import { ThemeProvider } from "@/components/theme-provider";
 
 export const metadata: Metadata = {
-  title: "Sahayak Teacher",
-  description: "Your AI-powered teaching assistant",
+  title: "Sahayak Live — AI Co-Teacher for Indian Classrooms",
+  description:
+    "A multi-agent voice AI that sits in your live classroom, waits for the right moment, and helps students without interrupting the teacher. Nine lesson powers, 20+ Indian languages.",
 };
 
 export default function RootLayout({
