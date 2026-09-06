@@ -1,69 +1,35 @@
 'use server';
 
 /**
- * @fileOverview Provides simple, accurate explanations for complex student questions in the local language, complete with easy-to-understand analogies.
- *
- * - explainConcept - A function that explains a concept.
- * - ExplainConceptInput - The input type for the explainConcept function.
- * - ExplainConceptOutput - The return type for the explainConcept function.
+ * Instant knowledge base — simple explanations with analogies, via Groq.
+ * (The original audio-question path used Gemini audio understanding; the
+ * dashboard UI sends text questions, so text-in/text-out covers the demo.)
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {groqJson} from '@/ai/groq';
+import {z} from 'zod';
 
 const ExplainConceptInputSchema = z
   .object({
     question: z.string().optional().describe('The complex question from the student as text.'),
-    audioQuestionDataUri: z
-      .string()
-      .optional()
-      .describe(
-        "The student's question as an audio data URI. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-      ),
+    audioQuestionDataUri: z.string().optional().describe('Unused (audio path not wired in the UI).'),
     localLanguage: z.string().describe('The local language of the explanation.'),
   })
-  .refine(data => data.question || data.audioQuestionDataUri, {
+  .refine((d) => d.question || d.audioQuestionDataUri, {
     message: 'Either a text question or an audio recording must be provided.',
   });
 export type ExplainConceptInput = z.infer<typeof ExplainConceptInputSchema>;
 
 const ExplainConceptOutputSchema = z.object({
-  explanation: z
-    .string()
-    .describe(
-      'A simple, accurate explanation in the local language, complete with easy-to-understand analogies.'
-    ),
+  explanation: z.string().describe('A simple, accurate explanation in the local language with easy analogies.'),
 });
 export type ExplainConceptOutput = z.infer<typeof ExplainConceptOutputSchema>;
 
 export async function explainConcept(input: ExplainConceptInput): Promise<ExplainConceptOutput> {
-  return explainConceptFlow(input);
+  return groqJson({
+    system:
+      'You are an expert teacher specializing in explaining complex concepts to students in simple terms, with easy-to-understand analogies from everyday life.',
+    prompt: `A student asked: "${input.question}". Write a simple, accurate explanation in ${input.localLanguage} (use its native script) with one everyday analogy. Return JSON: {"explanation": string}.`,
+    schema: ExplainConceptOutputSchema,
+  });
 }
-
-const prompt = ai.definePrompt({
-  name: 'explainConceptPrompt',
-  input: {schema: ExplainConceptInputSchema},
-  output: {schema: ExplainConceptOutputSchema},
-  prompt: `You are an expert teacher specializing in explaining complex concepts to students in simple terms. You will provide accurate explanations in the local language, complete with easy-to-understand analogies.
-
-  {{#if audioQuestionDataUri}}
-  The student's question is in the following audio. The audio can be in any language, including Hindi. Please transcribe the question accurately, and then provide your explanation.
-  Audio: {{media url=audioQuestionDataUri}}
-  {{else}}
-  The student's question is: "{{{question}}}"
-  {{/if}}
-
-  Please provide your explanation in {{{localLanguage}}}.`,
-});
-
-const explainConceptFlow = ai.defineFlow(
-  {
-    name: 'explainConceptFlow',
-    inputSchema: ExplainConceptInputSchema,
-    outputSchema: ExplainConceptOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
-  }
-);

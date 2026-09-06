@@ -1,19 +1,17 @@
 'use server';
 
 /**
- * @fileOverview This file defines a Genkit flow for generating an audio-visual explanation for a topic.
- *
- * - generateAudioVisualExplanation - A function that generates an explanation, an audio track, and a visual aid.
- * - GenerateAudioVisualExplanationInput - The input type for the function.
- * - GenerateAudioVisualExplanationOutput - The return type for the function.
+ * Audio-visual explanation: Groq writes the script, the Sahayak backend's
+ * proven multilingual TTS (Piper/edge-tts) speaks it, and Napkin draws the
+ * visual aid. (Was Gemini TTS + Gemini image gen; no Gemini key available.)
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-import wav from 'wav';
-import {googleAI} from '@genkit-ai/googleai';
+import {groqJson} from '@/ai/groq';
+import {generateNapkinVisual} from '@/ai/napkin';
+import {z} from 'zod';
 
-// Input Schema
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8001';
+
 const GenerateAudioVisualExplanationInputSchema = z.object({
   topic: z.string().describe('The topic to explain.'),
   language: z.string().describe('The language for the explanation and audio.'),
@@ -22,143 +20,51 @@ export type GenerateAudioVisualExplanationInput = z.infer<
   typeof GenerateAudioVisualExplanationInputSchema
 >;
 
-// Output Schema
 const GenerateAudioVisualExplanationOutputSchema = z.object({
   explanation: z.string().describe('The text explanation of the topic.'),
-  audioDataUri: z
-    .string()
-    .describe(
-      "A data URI for the audio file of the explanation. Expected format: 'data:audio/wav;base64,<encoded_data>'."
-    ),
-  visualAidDataUri: z
-    .string()
-    .describe(
-      "A data URI for the visual aid image. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-    ),
+  audioDataUri: z.string().describe("A data URI for the audio file: 'data:audio/wav;base64,<data>'."),
+  visualAidDataUri: z.string().describe('A data URI for the visual aid image.'),
 });
 export type GenerateAudioVisualExplanationOutput = z.infer<
   typeof GenerateAudioVisualExplanationOutputSchema
 >;
 
-// Exported function to be called from the UI
 export async function generateAudioVisualExplanation(
   input: GenerateAudioVisualExplanationInput
 ): Promise<GenerateAudioVisualExplanationOutput> {
-  return generateAudioVisualExplanationFlow(input);
-}
-
-// Prompt to generate the explanation script and a prompt for the visual aid
-const scriptAndImagePromptGenerator = ai.definePrompt({
-  name: 'scriptAndImagePromptGenerator',
-  input: {schema: z.object({topic: z.string(), language: z.string()})},
-  output: {
-    schema: z.object({
-      explanation: z
-        .string()
-        .describe(
-          'A clear and concise explanation of the topic, suitable for a short audio lesson. Keep it under 150 words.'
-        ),
-      imagePrompt: z
-        .string()
-        .describe(
-          'A simple, descriptive prompt to generate a visual aid for this explanation. Should be a line drawing or simple chart.'
-        ),
-    }),
-  },
-  prompt: `You are an expert educator. For the given topic, create a simple explanation in the specified language, and a prompt to generate an accompanying visual aid.
-
-Topic: {{{topic}}}
-Language: {{{language}}}`,
-});
-
-// Helper function to convert PCM audio data from TTS to WAV format
-async function toWav(
-  pcmData: Buffer,
-  channels = 1,
-  rate = 24000,
-  sampleWidth = 2
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const writer = new wav.Writer({
-      channels,
-      sampleRate: rate,
-      bitDepth: sampleWidth * 8,
-    });
-
-    const bufs: Buffer[] = [];
-    writer.on('error', reject);
-    writer.on('data', (d) => bufs.push(d));
-    writer.on('end', () => resolve(Buffer.concat(bufs).toString('base64')));
-
-    writer.write(pcmData);
-    writer.end();
+  // 1. Script via Groq
+  const {explanation, imagePrompt} = await groqJson({
+    system: 'You are an expert educator writing short spoken lessons for children.',
+    prompt:
+      `Write a clear, simple explanation of "${input.topic}" in ${input.language} (native script), under 120 words, ` +
+      'ending with a one-line recap. Also propose an English image prompt for a simple blackboard diagram of it. ' +
+      'Return JSON: {"explanation": string, "imagePrompt": string}',
+    schema: z.object({explanation: z.string(), imagePrompt: z.string()}),
   });
+
+  // 2. Audio via the backend's multilingual TTS + visual via Napkin (parallel)
+  const langMap: Record<string, string> = {
+    English: 'en', Hindi: 'hi', Marathi: 'mr', Telugu: 'te', Tamil: 'ta',
+    Bengali: 'bn', Gujarati: 'gu', Kannada: 'kn', Malayalam: 'ml', Urdu: 'ur',
+    Punjabi: 'pa', Odia: 'or',
+  };
+  const lang = langMap[input.language] || 'en';
+
+  const [audioDataUri, visualAidDataUri] = await Promise.all([
+    (async () => {
+      const res = await fetch(
+        `${BACKEND}/api/tts?text=${encodeURIComponent(explanation)}&lang=${encodeURIComponent(lang)}`
+      );
+      if (!res.ok) throw new Error(`TTS failed: ${res.status}`);
+      const buf = Buffer.from(await res.arrayBuffer());
+      return `data:audio/wav;base64,${buf.toString('base64')}`;
+    })(),
+    generateNapkinVisual({
+      content: imagePrompt,
+      context: `Blackboard-style teaching diagram for the topic: ${input.topic}.`,
+      width: 1200,
+    }).catch(() => ''),
+  ]);
+
+  return {explanation, audioDataUri, visualAidDataUri};
 }
-
-// The main Genkit flow
-const generateAudioVisualExplanationFlow = ai.defineFlow(
-  {
-    name: 'generateAudioVisualExplanationFlow',
-    inputSchema: GenerateAudioVisualExplanationInputSchema,
-    outputSchema: GenerateAudioVisualExplanationOutputSchema,
-  },
-  async (input) => {
-    // 1. Generate the script and image prompt first
-    const {output: scriptOutput} = await scriptAndImagePromptGenerator(input);
-    if (!scriptOutput) {
-      throw new Error('Failed to generate script and image prompt.');
-    }
-    const {explanation, imagePrompt} = scriptOutput;
-
-    // 2. Generate audio and image in parallel to save time
-    const [audioResponse, imageResponse] = await Promise.all([
-      // Audio Generation
-      ai.generate({
-        model: googleAI.model('gemini-2.5-flash-preview-tts'),
-        config: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {voiceName: 'Algenib'},
-            },
-          },
-        },
-        prompt: explanation,
-      }),
-      // Image Generation
-      ai.generate({
-        model: 'googleai/gemini-2.0-flash-preview-image-generation',
-        prompt: imagePrompt,
-        config: {
-          responseModalities: ['TEXT', 'IMAGE'],
-        },
-      }),
-    ]);
-
-    // 3. Process the audio response
-    if (!audioResponse.media?.url) {
-      throw new Error('No audio media returned from TTS generation.');
-    }
-    const audioBuffer = Buffer.from(
-      audioResponse.media.url.substring(
-        audioResponse.media.url.indexOf(',') + 1
-      ),
-      'base64'
-    );
-    const wavBase64 = await toWav(audioBuffer);
-    const audioDataUri = 'data:audio/wav;base64,' + wavBase64;
-
-    // 4. Process the image response
-    if (!imageResponse.media?.url) {
-      throw new Error('No image media returned from image generation.');
-    }
-    const visualAidDataUri = imageResponse.media.url;
-
-    // 5. Return the final combined output
-    return {
-      explanation,
-      audioDataUri,
-      visualAidDataUri,
-    };
-  }
-);

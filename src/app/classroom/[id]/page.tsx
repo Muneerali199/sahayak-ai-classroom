@@ -243,6 +243,9 @@ export default function ClassroomRoom() {
     error: agoraError,
     duckMic,
     aiOnline,
+    micOn,
+    micBusy,
+    toggleMic,
   } = useAgora({
     channel: `sahayak-${roomId}`,
     uid: userId,
@@ -357,7 +360,7 @@ export default function ClassroomRoom() {
             <div>
               <h1 className="font-bold text-lg">Sahayak Live</h1>
               <p className="text-xs text-white/50">
-                Room: {roomId} <span className="text-white/25">· a6</span>
+                Room: {roomId} <span className="text-white/25">· a7</span>
               </p>
             </div>
           </div>
@@ -400,6 +403,27 @@ export default function ClassroomRoom() {
                 ? "Joining Agora..."
                 : "Live Audio (Agora)"}
             </Button>
+            {role === "teacher" && liveAudio && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={micBusy || agoraStatus !== "joined"}
+                onClick={toggleMic}
+                className={`${
+                  micOn
+                    ? "bg-red-500/80 border-red-400/40 text-white hover:bg-red-500"
+                    : "border-white/20 text-white/70 hover:bg-white/10"
+                }`}
+                title={
+                  micOn
+                    ? "Mute your channel mic (recommended while the AI speaks)"
+                    : "Open your channel mic to talk to the class"
+                }
+              >
+                {micOn ? <MicOff className="w-4 h-4 mr-1" /> : <Mic className="w-4 h-4 mr-1" />}
+                {micBusy ? "Mic..." : micOn ? "Mic On" : "Talk to Class"}
+              </Button>
+            )}
             <div className={`w-2 h-2 rounded-full ${status === "connected" ? "bg-green-400" : "bg-red-400"}`} />
             <span className="text-xs text-white/50">
               {status === "connected" ? "Connected" : "Connecting..."}

@@ -63,7 +63,7 @@ LEAD_MS = 250
 # moments of the next speech (audible bursts). A -50 dB dither keeps the
 # stream "live" for the monitor while staying inaudible to listeners
 # (further attenuated by AI_VOLUME and the browser's track volume).
-DITHER_AMP = int(os.environ.get("AGORA_KEEPALIVE_LEVEL", "200"))  # int16 amplitude
+DITHER_AMP = int(os.environ.get("AGORA_KEEPALIVE_LEVEL", "600"))  # int16 amplitude
 KEEPER_CUSHION_MS = 150
 AI_UID = int(os.environ.get("AGORA_AI_UID", "1396787265"))
 # Piper/edge outputs are near full-scale; scale down before pushing so

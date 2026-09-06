@@ -41,6 +41,8 @@ export function useAgora({ channel, uid, role, enabled }: UseAgoraOptions) {
   const [peers, setPeers] = useState<number[]>([]);
   const [error, setError] = useState("");
   const [aiOnline, setAiOnline] = useState(false);
+  const [micOn, setMicOn] = useState(false);
+  const [micBusy, setMicBusy] = useState(false);
 
   // ─── Same-browser multi-tab guard ───────────────────────────────
   // When two tabs of the SAME browser join the same channel (local testing),
@@ -159,7 +161,6 @@ export function useAgora({ channel, uid, role, enabled }: UseAgoraOptions) {
 
     const safeChannel = channel.replace(/[^a-zA-Z0-9_\-\.]/g, "-").slice(0, 50);
     const numericUid = Array.from(uid).reduce((acc, c) => acc + c.charCodeAt(0), 0) % 1e9 || 1;
-    const isTeacher = role === "teacher";
 
     try {
       setStatus("joining");
@@ -210,36 +211,6 @@ export function useAgora({ channel, uid, role, enabled }: UseAgoraOptions) {
 
       await client.join(data.app_id, safeChannel, data.token, numericUid);
 
-      if (isTeacher) {
-        try {
-          const track = await Promise.race([
-            AgoraRTC.createMicrophoneAudioTrack({
-            encoderConfig: "speech_standard",
-            AEC: true, // echo cancellation kills the speaker->mic feedback loop
-            ANS: true, // noise suppression
-            AGC: true, // automatic gain control
-          }),
-            new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("Microphone timed out")), 8000)
-            ),
-          ]);
-          const published = await client.publish([track]).then(
-            () => true,
-            () => false
-          );
-          if (published) {
-            micTrackRef.current = track;
-            if (duckRef.current) duckMic(true);
-          } else {
-            track.close();
-          }
-        } catch (e) {
-          // Mic unavailable or permission denied — still join as a
-          // listener so the teacher hears the AI voice and live students.
-          console.warn("[agora] teacher mic unavailable, joined as listener:", e);
-        }
-      }
-
       setStatus("joined");
     } catch (e) {
       setStatus("error");
@@ -248,6 +219,56 @@ export function useAgora({ channel, uid, role, enabled }: UseAgoraOptions) {
       clientRef.current = null;
     }
   }, [channel, uid, role]);
+
+  // Explicit mic control (default OFF). An always-open teacher mic next to
+  // loud speakers re-broadcasts the AI's voice and room noise back into the
+  // channel — the delayed, noise-suppressed copy is the "old TV static"
+  // everyone hears under the AI's speech. The teacher now opens the mic only
+  // when they actually want to talk to the class.
+  const toggleMic = useCallback(async () => {
+    if (micBusy) return;
+    const client = clientRef.current;
+    if (!client) return;
+    setMicBusy(true);
+    try {
+      if (micTrackRef.current) {
+        const track = micTrackRef.current;
+        micTrackRef.current = null;
+        try { await client.unpublish([track]); } catch { /* ignore */ }
+        track.close();
+        setMicOn(false);
+        return;
+      }
+      const AgoraRTC = await loadAgora();
+      if (!AgoraRTC) return;
+      const track = await Promise.race([
+        AgoraRTC.createMicrophoneAudioTrack({
+          encoderConfig: "speech_standard",
+          AEC: true, // echo cancellation kills the speaker->mic feedback loop
+          ANS: true, // noise suppression
+          AGC: true, // automatic gain control
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Microphone timed out")), 8000)
+        ),
+      ]);
+      const published = await client.publish([track]).then(() => true, () => false);
+      if (published) {
+        micTrackRef.current = track;
+        if (duckRef.current) {
+          try { await track.setMuted(true); } catch { /* ignore */ }
+        }
+        setMicOn(true);
+      } else {
+        track.close();
+        throw new Error("Could not publish microphone");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setMicBusy(false);
+    }
+  }, [micBusy]);
 
   useEffect(() => {
     if (!enabled) {
@@ -268,5 +289,5 @@ export function useAgora({ channel, uid, role, enabled }: UseAgoraOptions) {
     };
   }, []);
 
-  return { status, peers, error, join, leave, duckMic, aiOnline };
+  return { status, peers, error, join, leave, duckMic, aiOnline, micOn, micBusy, toggleMic };
 }

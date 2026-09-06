@@ -1,15 +1,11 @@
 'use server';
 
 /**
- * @fileOverview AI-powered educational game generation flow.
- *
- * - generateGame - A function that generates an educational game.
- * - GenerateGameInput - The input type for the generateGame function.
- * - GenerateGameOutput - The return type for the generateGame function.
+ * Educational game generation, via Groq.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {groqJson} from '@/ai/groq';
+import {z} from 'zod';
 
 const GenerateGameInputSchema = z.object({
   topic: z.string().describe('The educational topic for the game.'),
@@ -26,30 +22,12 @@ const GenerateGameOutputSchema = z.object({
 export type GenerateGameOutput = z.infer<typeof GenerateGameOutputSchema>;
 
 export async function generateGame(input: GenerateGameInput): Promise<GenerateGameOutput> {
-  return generateGameFlow(input);
+  return groqJson({
+    system:
+      'You are a creative game designer specializing in educational games for children in low-resource classrooms.',
+    prompt:
+      `Create a fun, simple classroom game for topic "${input.topic}" and grade ${input.gradeLevel}. ` +
+      'It must be easy to set up with everyday materials. Return JSON: {"title": string, "description": string, "rules": [string], "materials": [string]}',
+    schema: GenerateGameOutputSchema,
+  });
 }
-
-const prompt = ai.definePrompt({
-  name: 'generateGamePrompt',
-  input: {schema: GenerateGameInputSchema},
-  output: {schema: GenerateGameOutputSchema},
-  prompt: `You are a creative game designer specializing in educational games for children. Create a fun and simple game based on the following topic and grade level. The game should be easy to set up and play in a classroom with limited resources.
-
-Topic: {{{topic}}}
-Grade Level: {{{gradeLevel}}}
-
-Generate a title, a brief description, a list of rules, and a list of required materials for the game.
-`,
-});
-
-const generateGameFlow = ai.defineFlow(
-  {
-    name: 'generateGameFlow',
-    inputSchema: GenerateGameInputSchema,
-    outputSchema: GenerateGameOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
-  }
-);

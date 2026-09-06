@@ -1,15 +1,11 @@
 'use server';
 
 /**
- * @fileOverview AI-powered weekly lesson planner flow.
- *
- * - createWeeklyLessonPlan - A function that generates a weekly lesson plan.
- * - CreateWeeklyLessonPlanInput - The input type for the createWeeklyLessonPlan function.
- * - CreateWeeklyLessonPlanOutput - The return type for the createWeeklyLessonPlan function.
+ * AI-powered weekly lesson planner, via Groq.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {groqJson} from '@/ai/groq';
+import {z} from 'zod';
 
 const CreateWeeklyLessonPlanInputSchema = z.object({
   topic: z.string().describe('The topic for the weekly lesson plan.'),
@@ -30,41 +26,19 @@ const DailyPlanSchema = z.object({
 const CreateWeeklyLessonPlanOutputSchema = z.object({
   title: z.string().describe('The title of the weekly lesson plan.'),
   summary: z.string().describe('A brief summary of the weekly lesson plan.'),
-  dailyPlans: z
-    .array(DailyPlanSchema)
-    .describe('A list of daily lesson plans for a 5-day week.'),
+  dailyPlans: z.array(DailyPlanSchema).describe('A list of daily lesson plans for a 5-day week.'),
 });
 export type CreateWeeklyLessonPlanOutput = z.infer<typeof CreateWeeklyLessonPlanOutputSchema>;
 
 export async function createWeeklyLessonPlan(input: CreateWeeklyLessonPlanInput): Promise<CreateWeeklyLessonPlanOutput> {
-  return createWeeklyLessonPlanFlow(input);
+  return groqJson({
+    system: 'You are an expert curriculum designer for Indian classrooms with limited resources.',
+    prompt:
+      `Create a detailed weekly lesson plan in ${input.localLanguage} (native script) for:\n` +
+      `Topic: ${input.topic}\nGrade: ${input.gradeLevel}\nLearning objectives: ${input.learningObjectives}\n\n` +
+      'Structure: title, summary, and 5 daily plans (Monday–Friday), each with day, topic, 2-4 engaging low-resource activities, an assessment method, and resources. ' +
+      'Return JSON: {"title": string, "summary": string, "dailyPlans": [{"day": string, "topic": string, "activities": [string], "assessment": string, "resources": [string]}]}',
+    schema: CreateWeeklyLessonPlanOutputSchema,
+    maxTokens: 3000,
+  });
 }
-
-const prompt = ai.definePrompt({
-  name: 'createWeeklyLessonPlanPrompt',
-  input: {schema: CreateWeeklyLessonPlanInputSchema},
-  output: {schema: CreateWeeklyLessonPlanOutputSchema},
-  prompt: `You are an expert teacher creating a weekly lesson plan.
-
-  Topic: {{{topic}}}
-  Grade Level: {{{gradeLevel}}}
-  Learning Objectives: {{{learningObjectives}}}
-  Local Language: {{{localLanguage}}}
-
-  Create a detailed weekly lesson plan in {{{localLanguage}}} based on the provided information.
-  Structure the output with a title for the week, a brief summary, and a day-by-day breakdown for a 5-day school week (e.g., Monday to Friday).
-  For each day, provide a specific topic, a list of engaging activities, a method for assessment, and a list of required resources.
-  `,
-});
-
-const createWeeklyLessonPlanFlow = ai.defineFlow(
-  {
-    name: 'createWeeklyLessonPlanFlow',
-    inputSchema: CreateWeeklyLessonPlanInputSchema,
-    outputSchema: CreateWeeklyLessonPlanOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
-  }
-);

@@ -1,15 +1,12 @@
 'use server';
 
 /**
- * @fileOverview This file defines a Genkit flow for generating hyper-local content in a teacher's local language based on a simple prompt.
- *
- * - generateLocalContent - A function that triggers the content generation flow.
- * - GenerateLocalContentInput - The input type for the generateLocalContent function.
- * - GenerateLocalContentOutput - The return type for the generateLocalContent function.
+ * Hyper-local content generation, powered by Groq (same key as the backend)
+ * instead of Gemini/Genkit.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {groqJson} from '@/ai/groq';
+import {z} from 'zod';
 
 const GenerateLocalContentInputSchema = z.object({
   prompt: z.string().describe('A simple prompt for generating local content.'),
@@ -23,24 +20,10 @@ const GenerateLocalContentOutputSchema = z.object({
 export type GenerateLocalContentOutput = z.infer<typeof GenerateLocalContentOutputSchema>;
 
 export async function generateLocalContent(input: GenerateLocalContentInput): Promise<GenerateLocalContentOutput> {
-  return generateLocalContentFlow(input);
+  return groqJson({
+    system:
+      'You are an expert in generating hyper-local teaching content. Write natural, culturally relevant material in the requested language (Devanagari script where applicable).',
+    prompt: `Generate teaching content in ${input.language} based on this prompt: "${input.prompt}". Return it as JSON with a single key "content" (markdown allowed: headings, bullet lists).`,
+    schema: GenerateLocalContentOutputSchema,
+  });
 }
-
-const generateLocalContentPrompt = ai.definePrompt({
-  name: 'generateLocalContentPrompt',
-  input: {schema: GenerateLocalContentInputSchema},
-  output: {schema: GenerateLocalContentOutputSchema},
-  prompt: `You are an expert in generating hyper-local content for teachers. Please generate content in the following language: {{{language}}}.  The content should be based on the following prompt: {{{prompt}}}.`,
-});
-
-const generateLocalContentFlow = ai.defineFlow(
-  {
-    name: 'generateLocalContentFlow',
-    inputSchema: GenerateLocalContentInputSchema,
-    outputSchema: GenerateLocalContentOutputSchema,
-  },
-  async input => {
-    const {output} = await generateLocalContentPrompt(input);
-    return output!;
-  }
-);
