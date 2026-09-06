@@ -32,8 +32,10 @@ const securityHeaders = [
       "img-src 'self' data: blob: https://images.unsplash.com https://placehold.co https://*.googleusercontent.com",
       "media-src 'self' data: blob:",
       "font-src 'self' data: https://fonts.gstatic.com",
-      // Firebase auth, Agora RTC (wss), and the optional local backend TTS
-      "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://apis.google.com https://*.agora.io wss://*.agora.io wss: http://127.0.0.1:8001 http://localhost:8001",
+      // Firebase auth, Agora RTC (wss + apis), and the optional local backend
+      // (ws:// needed for the classroom WebSocket — http:// alone does NOT
+      // match ws:// in Chrome's CSP matching)
+      "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://apis.google.com https://*.agora.io wss://*.agora.io https://*.sd-rtn.com wss://*.sd-rtn.com http://127.0.0.1:8001 http://localhost:8001 ws://127.0.0.1:8001 ws://localhost:8001",
       "frame-src https://*.firebaseapp.com https://apis.google.com",
       "object-src 'none'",
       "base-uri 'self'",

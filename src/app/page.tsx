@@ -125,12 +125,10 @@ const stats = [
 ];
 
 const team = [
-  { name: "Stuti Mishra", role: "Full Stack Developer", gradient: "from-violet-500 to-purple-600" },
-  { name: "Amitesh", role: "Backend Developer", gradient: "from-fuchsia-500 to-purple-600" },
-  { name: "Amardeep", role: "AI Specialist", gradient: "from-indigo-500 to-violet-600" },
-  { name: "Kapil", role: "UI/UX Designer", gradient: "from-purple-500 to-pink-500" },
-  { name: "Ayush", role: "Deploy Manager", gradient: "from-violet-600 to-indigo-500" },
-  { name: "Pratyush", role: "QA Tester", gradient: "from-fuchsia-600 to-violet-500" },
+  { name: "Muneer Ali", role: "Full Stack & AI", gradient: "from-violet-500 to-purple-600" },
+  { name: "Teena Goswami", role: "Backend & Voice", gradient: "from-fuchsia-500 to-purple-600" },
+  { name: "Manya", role: "UI/UX Design", gradient: "from-indigo-500 to-violet-600" },
+  { name: "Khushi", role: "Content & QA", gradient: "from-purple-500 to-pink-500" },
 ];
 
 const testimonials = [
@@ -561,10 +559,10 @@ export default function LandingPage() {
             <MotionDiv className="text-center mb-16">
               <h2 className="text-4xl md:text-5xl font-bold font-headline mb-6">
                 <span className="bg-gradient-to-b from-white to-purple-200 bg-clip-text text-transparent">Meet</span>{" "}
-                <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">Team 1-blitz</span>
+                <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">Team Code & Canvas</span>
               </h2>
               <p className="text-lg text-purple-100/60 max-w-2xl mx-auto">
-                Six builders passionate about putting a patient, polyglot AI co-teacher in every Indian classroom.
+                Four builders passionate about putting a patient, polyglot AI co-teacher in every Indian classroom.
               </p>
             </MotionDiv>
 
@@ -669,7 +667,7 @@ export default function LandingPage() {
           </div>
           <div className="mt-12 pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-sm text-purple-100/40">
-              © 2026 Sahayak Live · Built with <Heart className="w-4 h-4 text-fuchsia-400 inline" /> by Team 1-blitz
+              © 2026 Sahayak Live · Built with <Heart className="w-4 h-4 text-fuchsia-400 inline" /> by Team Code &amp; Canvas
             </div>
             <div className="text-sm text-purple-100/40">
               Made in India, for India's classrooms
