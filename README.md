@@ -214,27 +214,174 @@ Piper TTS ──▶ agora_voice_bridge.py ──▶ Agora RTC channel ──▶ 
 
 ## 🏗️ Architecture
 
+### 1. System overview
+
+Everything a user touches is the Next.js app (deployed on Vercel). The live classroom brain runs locally (FastAPI + LangGraph + Piper + Agora server SDK) because it needs low-latency WebSocket + TTS + RTC.
+
+```mermaid
+flowchart LR
+    subgraph Browser["Teacher & Students (Browser)"]
+        UI["Next.js 15 UI<br/>· landing /demo /login<br/>· /dashboard (9 powers)<br/>· /classroom/[id]"]
+        SR["Web Speech API<br/>(SpeechRecognition)"]
+        AR["Agora Web SDK<br/>(mic + playback)"]
+    end
+
+    subgraph Vercel["Vercel (deployed)"]
+        SA["Server Actions<br/>src/ai/flows/*"]
+        GQ["groq.ts<br/>(gpt-oss-120b + JSON mode)"]
+        NK["napkin.ts<br/>(diagram PNGs)"]
+    end
+
+    subgraph Local["Local backend — 127.0.0.1:8001 (FastAPI)"]
+        WS["/ws/classroom/{room}<br/>(room manager)"]
+        ORCH["ClassroomOrchestrator<br/>(LangGraph StateGraph, 9 agents)"]
+        LLM["llm_client<br/>Groq → Mistral → Gemini → Ollama"]
+        TTS["Piper neural TTS<br/>(+ edge-tts, `say` fallback)"]
+        AV["agora_voice.py<br/>(bridge controller)"]
+        TOK["/api/agora/token<br/>(token mint)"]
+    end
+
+    AGO["Agora RTC cloud<br/>(realtime audio channel)"]
+
+    UI -- "dashboard calls" --> SA --> GQ & NK
+    UI -- "WS messages (JOIN/UTTERANCE/CONTROL)" --> WS --> ORCH --> LLM
+    ORCH -- "AI reply" --> WS -- "AI_VOICE / PRIVATE / GAP_ALERT / QUIZ" --> UI
+    ORCH -- "speak(text)" --> AV -- "JSON on stdin" --> BR["scripts/agora_voice_bridge.py<br/>(piper-venv, Python 3.11)"]
+    BR -- "custom PCM 16 kHz<br/>(paced, dithered)" --> AGO
+    AR <--> AGO
+    UI -- "join channel" --> TOK
 ```
-Next.js 15 Frontend                    Python FastAPI + LangGraph Backend
-┌──────────────────────┐               ┌──────────────────────────────┐
-│ /classroom (lobby)   │─── WebSocket──│ /ws/classroom/{room_id}      │
-│ /classroom/[id]      │               │                              │
-│   - Floor badge      │               │  ClassroomOrchestrator       │
-│   - Transcript       │               │  (LangGraph StateGraph):     │
-│   - Agent swarm      │               │                              │
-│   - Teacher controls │               │  Ingest → Context →          │
-│   - Whisper toasts   │               │  CodeSwitch → GapRadar →     │
-│   - Live audio (mic) │── Agora RTC ──│  Differentiation →           │
-│     → shared channel │               │  FloorManager → Router →     │
-│ /dashboard           │─── REST ─────│  Action                      │
-│   - 9 lesson powers  │               │  (9 agents via llm_client)   │
-│   (Groq + Napkin)    │               │  Groq + Mistral + Ollama     │
-└──────────────────────┘               │                              │
-                    │                  │  Piper TTS ──▶ ± agora       │
-                    │  AI_VOICE events │  voice bridge ──▶ RTC        │
-                    └──────────────────│  (agora_voice.py)            │
-                                       └──────────────────────────────┘
+
+### 2. Multi-agent orchestration (LangGraph)
+
+Every utterance from teacher or students flows through the graph. The **Floor Manager gates the router** — the AI physically cannot act while the teacher is speaking.
+
+```mermaid
+flowchart TD
+    U["UTTERANCE (teacher/student)"] --> ING["ingest<br/>role-tag, dedupe, normalize"]
+    ING --> CTX["lesson_context<br/>rolling summary of topic + concepts"]
+    CTX --> CS["code_switch<br/>detect Hinglish/Tamil-English, set reply language"]
+    CS --> GR["gap_radar ⭐<br/>cluster confusion by concept<br/>fire COMMON_GAP at 2+ students"]
+    GR --> DF["differentiation<br/>per-student level (beginner/intermediate/advanced)"]
+    DF --> FM["floor_manager ⭐<br/>FSM: TEACHER_TALKING / STUDENT_TALKING / OPEN_FLOOR"]
+    FM -- "floor closed" --> NONE["no action (stay silent)"]
+    FM -- "floor open" --> RT{"router"}
+    RT -- "2+ same gap" --> EXP["explainer<br/>→ broadcast simpler explanation"]
+    RT -- "1 student confused,<br/>teacher talking" --> WHIS["whisper tutor<br/>→ PRIVATE message to one screen"]
+    RT -- "direct question / greeting" --> REP["replier<br/>→ conversational answer"]
+    RT -- "teacher 'quiz X'" --> QZ["quizmaster<br/>→ spoken quiz + evaluation"]
+    CS -. "end_class" .-> INS["insights<br/>→ post-class report"]
+    EXP & REP & QZ --> ACT["action node → main.py broadcasts + speaks"]
 ```
+
+### 3. Live classroom message lifecycle
+
+```mermaid
+sequenceDiagram
+    participant T as Teacher (browser)
+    participant S as Student (browser)
+    participant W as FastAPI /ws/classroom
+    participant O as LangGraph orchestrator
+    participant G as Groq
+    participant B as agora_voice_bridge
+    participant A as Agora channel
+
+    T->>W: UTTERANCE "To add fractions, first find the LCM…"
+    W->>O: run graph (ingest → … → floor_manager)
+    Note over O: floor = TEACHER_TALKING → no action
+    S->>W: UTTERANCE "I don't understand common denominators"
+    W->>O: run graph
+    O->>G: gap_radar / explainer prompts
+    G-->>O: explanation + language
+    O-->>W: action (reply / whisper / gap alert)
+    W-->>S: PRIVATE (whisper tutor, only this student)
+    W-->>T: GAP_ALERT "2 students · common denominators"
+    W->>B: {"cmd":"speak","text":…} (if broadcast)
+    B->>B: Piper TTS → PCM, paced +200ms lead
+    B->>A: push_audio_pcm_data (dithered keep-alive track)
+    A-->>T: AI voice plays on room speaker
+    A-->>S: AI voice plays (subscribed to AI uid 1396787265)
+    W-->>T: AI_VOICE start/stop (drives mic ducking)
+```
+
+### 4. Voice pipeline (why it sounds human and never blasts ears)
+
+```
+Groq reply ──▶ tts.py humanizer (strip markdown, expand fractions,
+              "3/4" → "three fourths") ──▶ Piper (offline neural voice,
+              22 kHz) ──▶ agora_voice_bridge.py
+                │  • 10 ms PCM chunks paced against elapsed + LEAD_MS (250)
+                │  • −50 dB dither keeps the track "live" between speech
+                │    (Agora's 4002 level monitor never trips → no static)
+                │  • gain 0.35 (≈ −9 dB) + trailing fade (no clicks)
+                ▼
+             Agora RTC ──▶ browser plays at track volume 40
+                          teacher mic auto-ducks while AI speaks
+```
+
+Root causes fixed (documented so they never come back):
+| Symptom | Root cause | Fix |
+|---|---|---|
+| TV-static during speech | encoder starvation → receiver loss-concealment | 250 ms lead pacing in the bridge |
+| Noise between utterances | track churn on (un)publish | permanent track + inaudible dither |
+| Echo/feedback loop | teacher mic re-broadcasting AI speaker | teacher mic OFF by default + explicit "Talk to Class" toggle + auto-duck |
+
+### 5. Dashboard (9 powers) data flow
+
+```mermaid
+flowchart LR
+    subgraph Client["Browser"]
+        F["feature component<br/>(e.g. upload textbook photo)"]
+    end
+    subgraph ServerAction["'use server' flow"]
+        A1["groqJson()"]
+        A2["qwen vision<br/>(image → worksheet)"]
+        A3["whisper-large-v3<br/>(audio → text)"]
+        A4["generateNapkinVisual()"]
+        A5["backend /api/tts<br/>(optional, best-effort)"]
+    end
+    subgraph APIs
+        GX["Groq API"]
+        NX["Napkin API"]
+        BE["local FastAPI"]
+    end
+    F --> A1 --> GX
+    F --> A2 --> GX
+    F --> A3 --> GX
+    F --> A4 --> NX
+    F --> A5 --> BE
+    A1 & A2 & A3 & A4 & A5 -- "JSON / data-URI result" --> F
+```
+
+Every flow degrades gracefully: no Napkin key → text-only; no local backend → audio player hidden, text + visuals still generated.
+
+### 7. WebSocket protocol (`/ws/classroom/{room_id}`)
+
+**Client → server**
+
+| Message | Purpose |
+|---|---|
+| `{"type":"JOIN","user_id","name","role"}` | Enter the room (teacher/student) |
+| `{"type":"UTTERANCE","text","is_final"}` | A spoken/typed sentence (drives the graph) |
+| `{"type":"TEACHER_CONTROL","action":"mute"\|"unmute"\|"end_class"\|"quiz","target_student_id"?}` | Teacher override |
+| `{"type":"LIVE_AUDIO","enabled":bool}` | Tell the backend who is on the Agora channel |
+| `{"type":"QUIZ_ANSWER","student_id","text"}` | Student's answer to a Quizmaster question |
+
+**Server → client**
+
+| Message | Purpose |
+|---|---|
+| `JOINED` / `PARTICIPANT_JOINED` | roster updates |
+| `UTTERANCE` | transcript entry (role-tagged) |
+| `FLOOR_STATE` | turn-taking FSM state → drives the floor badge |
+| `AGENT_LOG` | live per-agent activity (the agent swarm panel) |
+| `GAP_ALERT` | common misconception detected (concept + student count) |
+| `WHISPER` / `WHISPER_NOTIFY` | private explanation to one student / teacher notification |
+| `AI_SPEAK` | broadcast reply (text + speech) |
+| `QUIZ_ASK` / `QUIZ_RESULT` | spoken quiz + evaluation |
+| `AI_VOICE` | AI speech start/stop (drives mic ducking + caption bar) |
+| `AI_MUTED` / `APPROVE_MODE` | teacher control acks |
+| `SESSION_ENDED` | end-of-class insights payload |
 
 ---
 
@@ -368,13 +515,13 @@ Full research + pricing + go-to-market: **[docs/business-model.md](docs/business
 The site is deployed on Vercel: **https://sahayak-live-virid.vercel.app**
 
 - Landing page (purple theme + aurora video hero) at `/`
-- Full product demo video at `/demo` — a 60-second walkthrough with real generated output
+- Product demo video (2:40, narrated + subtitled) at `/demo`
 - Dashboard (Groq + Napkin keys configured as Vercel env vars) at `/dashboard`
 
-**Embed the demo video anywhere** (e.g. Commudle submission):
+**Video Demo (Iframe 320px × 200px):**
 
 ```html
-<iframe src="https://sahayak-live-virid.vercel.app/demo" width="600" height="400" allow="autoplay; fullscreen" allowfullscreen></iframe>
+<iframe src="https://sahayak-live-virid.vercel.app/demo" width="320" height="200" allow="autoplay; fullscreen" allowfullscreen></iframe>
 ```
 
 Security: strict CSP + `X-Frame-Options`/`frame-ancestors` deny framing on all routes except `/demo` (which allows embeds), HSTS, nosniff, referrer-policy, and a locked-down permissions policy (mic only). Secrets stay server-side in Vercel env vars — nothing is committed.
