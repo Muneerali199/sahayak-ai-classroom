@@ -9,6 +9,8 @@ import {
   BrainCircuit,
   CalendarPlus,
   CheckCircle,
+  Compass,
+  FileQuestion,
   Gamepad2,
   Languages,
   MessageCircle,
@@ -21,6 +23,7 @@ import {
   Signal,
   Sparkles,
   Star,
+  TrendingUp,
   UsersRound,
   Volume2,
 } from "lucide-react";
@@ -95,6 +98,9 @@ const powers = [
   { icon: <Gamepad2 className="w-4 h-4" />, title: "Game Generation", description: "Classroom games from any lesson topic" },
   { icon: <Presentation className="w-4 h-4" />, title: "Audio-Visual Explanations", description: "Spoken lesson + custom visual, together" },
   { icon: <Rabbit className="w-4 h-4" />, title: "Interactive Storyteller", description: "Stories with character voices & illustrations" },
+  { icon: <FileQuestion className="w-4 h-4" />, title: "Quiz Generator", description: "MCQs with explanations — projected in seconds" },
+  { icon: <Compass className="w-4 h-4" />, title: "Career Guidance", description: "India-specific career paths from interests & strengths" },
+  { icon: <TrendingUp className="w-4 h-4" />, title: "Student Progress", description: "Mastery, streaks & AI study insight per student" },
 ];
 
 const indiaPoints = [
@@ -361,7 +367,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ── 9 powers ──────────────────────────────────────── */}
+        {/* ── 12 powers ──────────────────────────────────────── */}
         <section id="powers" className="relative border-t border-white/[0.07]">
           <div className="mx-auto max-w-6xl px-6 py-24">
             <Reveal className="flex flex-wrap items-end justify-between gap-6 mb-14">
@@ -370,7 +376,7 @@ export default function LandingPage() {
                   The dashboard
                 </p>
                 <h2 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight">
-                  Nine lesson powers.
+                  Twelve lesson powers.
                   <br />
                   One dashboard.
                 </h2>

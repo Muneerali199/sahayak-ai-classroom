@@ -27,7 +27,7 @@ Continuously scans student utterances for confusion signals and **clusters them 
 The same AI is simultaneously a class co-teacher (broadcasts to everyone) **and** a per-student private tutor. When one student is confused but the teacher is mid-sentence, the AI sends a targeted simpler explanation to **only that student's screen** — without interrupting the class.
 
 ### 4. 🧠 An 8-in-1 Lesson Studio (Demo Showcase)
-A full **teacher dashboard at `/dashboard`** with **nine working, live-output features** (text, audio **and** visual aids) — every single one callable in a live demo with real generated output, not placeholders.
+A full **teacher dashboard at `/dashboard`** with **twelve working, live-output features** (text, audio **and** visual aids) — every single one callable in a live demo with real generated output, not placeholders.
 
 ---
 
@@ -49,7 +49,7 @@ A full **teacher dashboard at `/dashboard`** with **nine working, live-output fe
 
 ---
 
-## 🧰 The Dashboard — 9 Working Lesson Powers
+## 🧰 The Dashboard — 12 Working Lesson Powers
 
 Every flow below runs **live against real APIs** at `http://localhost:9002/dashboard` and returns generated output (text, spoken audio, and diagram images) — demo-ready.
 
@@ -64,6 +64,9 @@ Every flow below runs **live against real APIs** at `http://localhost:9002/dashb
 | 7 | **Game Generation** | Classroom game from any lesson topic | Groq `gpt-oss-120b` |
 | 8 | **Audio-Visual Explanation** | A topic → spoken audio **+** a visual aid | Groq + Piper TTS (backend) + Napkin |
 | 9 | **Interactive Storyteller** | A prompt → story, per-scene narration audio **+** illustrations | Groq + Piper TTS + Napkin |
+| 10 | **Quiz Generator** | MCQs with explanations, projected in seconds; answers save to progress | Groq `gpt-oss-120b` |
+| 11 | **Career Guidance** | India-specific career paths from interests & strengths | Groq `gpt-oss-120b` |
+| 12 | **Student Progress** | Mastery bars, streaks, activity feed + AI study insight | Local analytics + quiz/assessment store |
 
 > The dashboard used to depend on Genkit + a Gemini key. It was rewritten so a **single Groq key** powers all text/vision/audio and a **single Napkin key** powers all diagrams — no Gemini required. See [`src/ai/`](#dashboard--bookkeeping-powers).
 
@@ -134,7 +137,7 @@ NEXT_PUBLIC_DEMO_LOGIN=1
 
 ### 4. Dashboard demo
 
-Open `http://localhost:9002/dashboard` → pick any of the **9 lesson powers** → watch it generate real output (text, audio, and diagram images).
+Open `http://localhost:9002/dashboard` → pick any of the **12 lesson powers** → watch it generate real output (text, audio, and diagram images).
 
 ---
 
@@ -221,7 +224,7 @@ Everything a user touches is the Next.js app (deployed on Vercel). The live clas
 ```mermaid
 flowchart LR
     subgraph Browser["Teacher & Students (Browser)"]
-        UI["Next.js 15 UI<br/>· landing /demo /login<br/>· /dashboard (9 powers)<br/>· /classroom/[id]"]
+        UI["Next.js 15 UI<br/>· landing /demo /login<br/>· /dashboard (12 powers)<br/>· /classroom/[id]"]
         SR["Web Speech API<br/>(SpeechRecognition)"]
         AR["Agora Web SDK<br/>(mic + playback)"]
     end
@@ -326,7 +329,7 @@ Root causes fixed (documented so they never come back):
 | Noise between utterances | track churn on (un)publish | permanent track + inaudible dither |
 | Echo/feedback loop | teacher mic re-broadcasting AI speaker | teacher mic OFF by default + explicit "Talk to Class" toggle + auto-duck |
 
-### 5. Dashboard (9 powers) data flow
+### 5. Dashboard (12 powers) data flow
 
 ```mermaid
 flowchart LR
@@ -394,7 +397,7 @@ sahayak-live/
 │   │   ├── classroom/                # live classroom
 │   │   │   ├── page.tsx              #   lobby (create/join room)
 │   │   │   └── [id]/page.tsx         #   room view (floor badge, mic toggle, AI_VOICE)
-│   │   ├── dashboard/page.tsx        # 9 lesson powers + Go Live CTA
+│   │   ├── dashboard/page.tsx        # 12 lesson powers + Go Live CTA
 │   │   └── login/page.tsx            # Google sign-in (bypassed by demo login)
 │   ├── ai/                           # dashboard generation layer
 │   │   ├── groq.ts                   #   Groq JSON-mode helper (all text/vision/audio flows)

@@ -7,10 +7,13 @@ import {
   CalendarPlus,
   Gamepad2,
   Languages,
+  ListChecks,
+  Compass,
   Paintbrush,
   PanelLeft,
   Presentation,
   Rabbit,
+  TrendingUp,
   UsersRound,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -47,6 +50,9 @@ import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useIsMobile } from "@/hooks/use-mobile";
 import InteractiveStoryteller from "@/components/features/interactive-storyteller";
+import QuizGenerator from "@/components/features/quiz-generator";
+import CareerGuidance from "@/components/features/career-guidance";
+import StudentProgress from "@/components/features/student-progress";
 
 
 type Feature =
@@ -58,7 +64,10 @@ type Feature =
   | "assess"
   | "gamify"
   | "explain"
-  | "storytell";
+  | "storytell"
+  | "quiz"
+  | "career"
+  | "progress";
 
 function Dashboard() {
   const [activeFeature, setActiveFeature] = React.useState<Feature>("localize");
@@ -112,6 +121,12 @@ function Dashboard() {
         return <AudioVisualExplanation />;
       case "storytell":
         return <InteractiveStoryteller />;
+      case "quiz":
+        return <QuizGenerator />;
+      case "career":
+        return <CareerGuidance />;
+      case "progress":
+        return <StudentProgress />;
       default:
         return <LocalizedContent />;
     }
@@ -136,6 +151,9 @@ function Dashboard() {
     { id: "gamify", icon: Gamepad2, label: "Game Generation", disabled: false },
     { id: "explain", icon: Presentation, label: "Audio-Visual Explanation" },
     { id: "storytell", icon: Rabbit, label: "Interactive Storyteller" },
+    { id: "quiz", icon: ListChecks, label: "Quiz Generator" },
+    { id: "career", icon: Compass, label: "Career Guidance" },
+    { id: "progress", icon: TrendingUp, label: "Student Progress" },
   ];
 
   return (
